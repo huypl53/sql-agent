@@ -1,0 +1,6 @@
+# This file is intentionally left blank.
+hydra-core
+hydra-colorlog
+langchain-community 
+langchainhub 
+langgraph
