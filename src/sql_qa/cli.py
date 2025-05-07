@@ -105,6 +105,7 @@ async def chat_completions(request: ChatCompletionRequest):
             stream_mode="values",
         ):
             final_response = step["messages"][-1]
+            logger.info(f"Bot: {final_response}")
 
         # Log final response
         logger.info(f"Bot: {final_response}")
