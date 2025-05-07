@@ -4,3 +4,7 @@ hydra-colorlog
 langchain-community 
 langchainhub 
 langgraph
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.6.0
+cryptography>=42.0.0  # Required for MySQL authentication

@@ -4,7 +4,7 @@ This is a SQL Question Answering application that allows users to interact with 
 
 ## Project Structure
 
-```
+```text
 SQL-QA
 ├── main.py                 # Main application entry point
 ├── shared/                 # Shared utilities
@@ -27,9 +27,7 @@ SQL-QA
 
 ## Prerequisites
 
-- Python 3.8+
-- Mistral AI API key
-- Database connection (optional, defaults to SQLite Chinook sample database)
+- Python 3.10+
 
 ## Installation
 
@@ -53,13 +51,11 @@ source .venv/bin/activate
 3. Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 4. Set up environment variables:
-   - Create a `.env` file in the project root
-   - Add your Mistral AI API key: `MISTRAL_API_KEY=your_api_key`
-   - Optionally add database connection string: `DB_CONN=mysql+pymysql://username:password@host:port/database_name`
+   - Create a `.env` file in the project root using `.env.example`
 
 5. Generate sample database (if using SQLite):
 
@@ -72,41 +68,31 @@ curl -s https://raw.githubusercontent.com/lerocha/chinook-database/master/Chinoo
 Run the application:
 
 ```bash
-python main.py
+uv run --directory ./src/sql_qa/ uvicorn cli:app --reload --port 8000
+
+# Then test
+curl -X POST http://localhost:8000/v1/chat/completions \
+-H "Content-Type: application/json" \
+-d '{
+  "model": "gpt-3.5-turbo",
+  "messages": [
+    {
+      "role": "user",
+      "content": "có bao nhiêu khách hàng trong CSDL?"
+    }
+  ],
+  "temperature": 0.7,
+  "stream": false
+}'
 ```
 
 Options:
 
 - `--verbose`: Enable verbose mode to see agent thoughts (default: True)
 
-The application will prompt you to enter questions about the database. Type your questions in natural language, and the agent will translate them to SQL queries and provide answers.
-
-To exit the application, type `q` or `quit`.
-
-## Logging
-
-All interactions are logged to the `logs/` directory. Log files include:
-
-- User input
-- Agent responses
-- Agent thoughts (in verbose mode)
-- Any errors or warnings
-
-Log files use UTF-8 encoding to support international characters.
-
-## Troubleshooting
-
-If you encounter encoding errors when logging, ensure that:
-
-1. The logs directory exists
-2. Your system supports UTF-8 encoding
-3. The logger is properly configured with UTF-8 encoding (already implemented)
-
 ## License
 
 [Specify your license here]
-
-## SQL agnet
 
 ## Challenges
 

@@ -3,6 +3,7 @@ import sys
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 
 def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
@@ -21,7 +22,11 @@ def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
 
 
 def get_logger(
-    name: str, level: Optional[int] = None, log_file: Optional[str] = None
+    name: str,
+    level: Optional[int] = None,
+    log_file: Optional[str] = None,
+    max_bytes: int = 5 * 1024 * 1024,  # 10MB default
+    backup_count: int = 5,  # Keep 5 backup files by default
 ) -> logging.Logger:
     """
     Get a configured logger instance.
@@ -31,6 +36,8 @@ def get_logger(
         level: Optional logging level. If not provided, uses INFO level
         log_file: Optional path to log file or directory. If directory is provided,
                  a timestamped log file will be created in that directory
+        max_bytes: Maximum size of each log file before rotation (default: 10MB)
+        backup_count: Number of backup files to keep (default: 5)
 
     Returns:
         logging.Logger: Configured logger instance
@@ -71,8 +78,10 @@ def get_logger(
             # Create parent directory if it doesn't exist
             log_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Use UTF-8 encoding for the file handler to handle Unicode characters
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        # Use RotatingFileHandler instead of FileHandler
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+        )
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
