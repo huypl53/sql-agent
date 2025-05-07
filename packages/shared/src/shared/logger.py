@@ -72,7 +72,7 @@ def get_logger(
     if log_file:
         # If log_file is a directory, create a timestamped log file
         log_path = Path(log_file)
-        if log_path.is_dir():
+        if str(log_path).endswith("/") or str(log_path).endswith("\\"):
             log_file = get_timestamped_log_file(str(log_path), prefix=name)
         else:
             # Create parent directory if it doesn't exist
