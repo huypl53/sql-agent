@@ -11,7 +11,7 @@ from langgraph.prebuilt import create_react_agent
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 import uvicorn
 from omegaconf import OmegaConf
 
@@ -37,13 +37,48 @@ class ChatCompletionRequest(BaseModel):
     stream: Optional[bool] = False
 
 
+class TokenDetails(BaseModel):
+    cached_tokens: int = 0
+    audio_tokens: int = 0
+
+
+class CompletionTokenDetails(BaseModel):
+    reasoning_tokens: int = 0
+    audio_tokens: int = 0
+    accepted_prediction_tokens: int = 0
+    rejected_prediction_tokens: int = 0
+
+
+class Usage(BaseModel):
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    prompt_tokens_details: TokenDetails
+    completion_tokens_details: CompletionTokenDetails
+
+
+class AssistantMessage(BaseModel):
+    role: str
+    content: str
+    refusal: Optional[str] = None
+    annotations: List[Any] = []
+
+
+class Choice(BaseModel):
+    index: int
+    message: AssistantMessage
+    logprobs: Optional[Any] = None
+    finish_reason: str
+
+
 class ChatCompletionResponse(BaseModel):
     id: str
     object: str = "chat.completion"
     created: int
     model: str
-    choices: List[Dict[str, Any]]
-    usage: Dict[str, int]
+    choices: List[Choice]
+    usage: Usage
+    service_tier: str = "default"
 
 
 app = FastAPI(title="SQL QA API")
@@ -116,20 +151,26 @@ async def chat_completions(request: ChatCompletionRequest):
             created=int(pathlib.Path(__file__).stat().st_mtime),
             model=request.model,
             choices=[
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": final_response.content,
-                    },
-                    "finish_reason": "stop",
-                }
+                Choice(
+                    index=0,
+                    message=AssistantMessage(
+                        role="assistant",
+                        content=final_response.content,
+                        refusal=None,
+                        annotations=[],
+                    ),
+                    logprobs=None,
+                    finish_reason="stop",
+                )
             ],
-            usage={
-                "prompt_tokens": 0,
-                "completion_tokens": 0,
-                "total_tokens": 0,
-            },
+            usage=Usage(
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0,
+                prompt_tokens_details=TokenDetails(),
+                completion_tokens_details=CompletionTokenDetails(),
+            ),
+            service_tier="default",
         )
 
         return response
