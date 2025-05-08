@@ -68,6 +68,7 @@ curl -s https://raw.githubusercontent.com/lerocha/chinook-database/master/Chinoo
 Run the application:
 
 ```bash
+# API version
 uv run uvicorn src.sql_qa.cli:app --reload --port 8000
 
 # Then test
@@ -84,6 +85,9 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   "temperature": 0.7,
   "stream": false
 }'
+
+# UI version
+uv run streamlit run ./src/sql_qa/ui.py
 ```
 
 Options:
