@@ -68,7 +68,7 @@ curl -s https://raw.githubusercontent.com/lerocha/chinook-database/master/Chinoo
 Run the application:
 
 ```bash
-uv run --directory ./src/sql_qa/ uvicorn cli:app --reload --port 8000
+uv run uvicorn src.sql_qa.cli:app --reload --port 8000
 
 # Then test
 curl -X POST http://localhost:8000/v1/chat/completions \

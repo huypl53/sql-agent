@@ -4,12 +4,13 @@ import logging
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True, verbose=True)
 
 logger = get_logger(__name__, logging.INFO)
 
 # MySQL connection string format: mysql+pymysql://username:password@host:port/database_name
 conn = os.environ.get("DB_CONN", None)
+logger.info(f"DB_CONN: {conn}")
 if not conn:
     conn = "sqlite:///Chinook.db"
     logger.warning(

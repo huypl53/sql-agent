@@ -1,5 +1,4 @@
 import logging
-from shared import db as mdb
 from shared.logger import get_logger
 import pathlib
 import os
@@ -7,78 +6,32 @@ from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
-from langgraph.prebuilt import create_react_agent
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 import uvicorn
 from omegaconf import OmegaConf
+from shared.db import db as mdb
+
+# from sql_qa.config import DEFAULT_CONFIG
+from sql_qa.chat import get_agent_executor
+from sql_qa.config import get_config
+from sql_qa.schema import (
+    AssistantMessage,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    Choice,
+    CompletionTokenDetails,
+    TokenDetails,
+    Usage,
+)
 
 load_dotenv()
 
 # Load configuration from YAML file
-CONFIG_PATH = pathlib.Path(__file__).parent / "config.yaml"
-DEFAULT_CONFIG = OmegaConf.load(CONFIG_PATH)
 # Register environment variable resolver
 # OmegaConf.register_resolver("env", lambda x: os.environ.get(x, ""))
-
-
-# Pydantic models for request/response
-class Message(BaseModel):
-    role: str
-    content: str
-
-
-class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[Message]
-    temperature: Optional[float] = 0.7
-    stream: Optional[bool] = False
-
-
-class TokenDetails(BaseModel):
-    cached_tokens: int = 0
-    audio_tokens: int = 0
-
-
-class CompletionTokenDetails(BaseModel):
-    reasoning_tokens: int = 0
-    audio_tokens: int = 0
-    accepted_prediction_tokens: int = 0
-    rejected_prediction_tokens: int = 0
-
-
-class Usage(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    prompt_tokens_details: TokenDetails
-    completion_tokens_details: CompletionTokenDetails
-
-
-class AssistantMessage(BaseModel):
-    role: str
-    content: str
-    refusal: Optional[str] = None
-    annotations: List[Any] = []
-
-
-class Choice(BaseModel):
-    index: int
-    message: AssistantMessage
-    logprobs: Optional[Any] = None
-    finish_reason: str
-
-
-class ChatCompletionResponse(BaseModel):
-    id: str
-    object: str = "chat.completion"
-    created: int
-    model: str
-    choices: List[Choice]
-    usage: Usage
-    service_tier: str = "default"
 
 
 app = FastAPI(title="SQL QA API")
@@ -92,32 +45,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+config = get_config()
 # Initialize logger
 logger = get_logger(
     "main",
     logging.INFO,
-    log_file=DEFAULT_CONFIG.logging.log_dir,
-    max_bytes=DEFAULT_CONFIG.logging.max_bytes,
-    backup_count=DEFAULT_CONFIG.logging.backup_count,
+    log_file=config.logging.log_dir,
+    max_bytes=config.logging.max_bytes,
+    backup_count=config.logging.backup_count,
 )
 logger.info(f"Working directory: {os.getcwd()}")
-logger.info(f"Configuration: {OmegaConf.to_yaml( DEFAULT_CONFIG )}")
+logger.info(f"Configuration: {OmegaConf.to_yaml( config )}")
 
 # Initialize LLM and agent
-logger.info(f"LLM: {DEFAULT_CONFIG.llm.provider} ({DEFAULT_CONFIG.llm.model_provider})")
-llm = init_chat_model(
-    DEFAULT_CONFIG.llm.provider, model_provider=DEFAULT_CONFIG.llm.model_provider
-)
+logger.info(f"LLM: {config.llm.provider} ({config.llm.model_provider})")
 
-db = mdb.db
-toolkit = SQLDatabaseToolkit(db=db, llm=llm)
-tools = toolkit.get_tools()
-
-# Format the prompt template with configuration values
-system_message = DEFAULT_CONFIG.prompt.template.format(
-    dialect=DEFAULT_CONFIG.database.dialect, top_k=DEFAULT_CONFIG.database.top_k
-)
-agent_executor = create_react_agent(llm, tools, prompt=system_message)
+agent_executor = get_agent_executor(mdb)
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
@@ -183,11 +126,11 @@ async def chat_completions(request: ChatCompletionRequest):
 def main() -> None:
     uvicorn.run(
         app,
-        host=DEFAULT_CONFIG.server.host,
-        port=DEFAULT_CONFIG.server.port,
-        log_level=DEFAULT_CONFIG.server.log_level,
-        reload=DEFAULT_CONFIG.server.reload,
-        workers=DEFAULT_CONFIG.server.workers,
+        host=config.server.host,
+        port=config.server.port,
+        log_level=config.server.log_level,
+        reload=config.server.reload,
+        workers=config.server.workers,
     )
 
 
