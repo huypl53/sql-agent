@@ -12,6 +12,10 @@ llm:
 database:
   dialect: ${oc.env:DB_DIALECT,postgresql}
   top_k: ${oc.env:DB_TOP_K,5}
+  
+persist:
+  dialect: ${oc.env:PERSIST_DIALECT,postgresql}
+  host: ${oc.env:PERSIST_HOST,localhost}
 
 logging:
   log_dir: "./logs/"

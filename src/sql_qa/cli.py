@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 from shared.db import db as mdb
 
 # from sql_qa.config import DEFAULT_CONFIG
-from sql_qa.chat import get_agent_executor
+from sql_qa.chat import gen_agent_executor
 from sql_qa.config import get_config
 from sql_qa.schema import (
     AssistantMessage,
@@ -60,7 +60,7 @@ logger.info(f"Configuration: {OmegaConf.to_yaml( config )}")
 # Initialize LLM and agent
 logger.info(f"LLM: {config.llm.provider} ({config.llm.model_provider})")
 
-agent_executor = get_agent_executor(mdb)
+agent_executor, checkpointer = next(gen_agent_executor(mdb))
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
@@ -76,10 +76,13 @@ async def chat_completions(request: ChatCompletionRequest):
         # Log user input
         logger.info(f"User: {last_message}")
 
+        configurable = {"configurable": {"thread_id": "1", "user_id": "1"}}
         # Process agent response
         final_response = None
         for step in agent_executor.stream(
-            {"messages": [HumanMessage(content=last_message)]},
+            # {"messages": [HumanMessage(content=last_message)]},
+            {"messages": request.messages[-10:]},
+            config=configurable,
             stream_mode="values",
         ):
             final_response = step["messages"][-1]

@@ -1,5 +1,5 @@
 from .cli import app, main
-from .chat import get_agent_executor
+from .chat import gen_agent_executor
 from .config import get_config
 from .schema import (
     AssistantMessage,
