@@ -22,3 +22,7 @@ class SQLGenerationResponse(LlmResponse):
 class SQLQueryFixingResponse(LlmResponse):
     is_correct: bool
     explanation: Optional[str]
+
+
+class SqlResponseEnhancementResponse(LlmResponse):
+    enhanced_result: str

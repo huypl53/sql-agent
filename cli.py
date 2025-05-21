@@ -1,24 +1,23 @@
 import click
 import json
+from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.messages import trim_messages
 from langgraph.checkpoint.memory import MemorySaver
 from shared.db import get_db
-from sql_qa.llm.type import (
-    SQLQueryFixingResponse,
-)
-from sql_qa.llm.type import SQLGenerationResponse, SqlLinkingTablesResponse
+from sql_qa.llm.generation import LLMDirectGeneration
+from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
 from sql_qa.prompt.constant import PromptConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import ApiAdapter
-from sql_qa.config import get_config
+from sql_qa.config import get_app_config
 from shared.logger import get_logger
 
 from sql_qa.schema.store import Schema, SchemaStore
 
 logger = get_logger(__name__, log_file="./logs/cli.log")
 
-app_config = get_config()
+app_config = get_app_config()
 logger.info(json.dumps(app_config.model_dump(), indent=4, ensure_ascii=False))
 
 
@@ -52,37 +51,21 @@ def cli():
         # checkpointer=checkpointer,
     )
 
-    generation_adapter = ApiAdapter(
-        model=f"{app_config.llm.provider}:{app_config.llm.model}",
-        tools=tools,
-        prompt=PromptConstant.system_prompt.format(
-            dialect=app_config.database.dialect.upper()
-        ),
-        response_format=SQLGenerationResponse,
-        checkpointer=checkpointer,
-        # pre_model_hook=trimmer,
-    )
-
-    query_fixing_adapter = ApiAdapter(
-        model=f"{app_config.llm.provider}:{app_config.llm.model}",
-        tools=tools,
-        prompt=PromptConstant.system_prompt.format(
-            dialect=app_config.database.dialect.upper()
-        ),
-        response_format=SQLQueryFixingResponse,
-        # checkpointer=checkpointer,
-    )
     response_enhancement_adapter = ApiAdapter(
         model=f"{app_config.llm.provider}:{app_config.llm.model}",
         tools=tools,
         prompt=PromptConstant.system_prompt.format(
             dialect=app_config.database.dialect.upper()
         ),
+        response_format=SqlResponseEnhancementResponse,
         # checkpointer=checkpointer,
     )
+
+    sql_generator = LLMDirectGeneration(chat_config)
     schema = Schema.load(app_config.schema_path)
     schema_store = SchemaStore()
     schema_store.add_schema(schema)
+
     while (user_question := input("Enter a SQL question: ").lower()) not in [
         "exit",
         "quit",
@@ -126,96 +109,19 @@ def cli():
             f"filtered_schema_tables: {[t.name for s in filtered_schema_tables.values() for t in s.tables if s]}"
         )
 
-        run_iter = 0
-        response_is_correct = False
-        generation_evidence = ""
-        final_sql = ""
-        while run_iter < 2 and not response_is_correct:
-            logger.info(
-                f"Run iteration: {run_iter}; Evidence: {generation_evidence}; Response is correct: {response_is_correct}"
-            )
-            run_iter += 1
-            generation_response = generation_adapter.invoke(
-                {
-                    "messages": [
-                        {
-                            "role": Role.ASSISTANT,
-                            "content": PromptConstant.direct_generation_prompt.format(
-                                question=user_question,
-                                evidence=generation_evidence,
-                                schema=filtered_schema_tables,
-                            ),
-                        }
-                    ]
-                },
-                config=chat_config,
-            )
-            if not generation_response:
-                logger.error(f"Generation response is None")
-                continue
-            generation_result = generation_response["messages"][-1]
-            logger.info(f"SQL Generation result: {generation_result.content}")
-            logger.info(
-                f"SQL Generation structured result: {generation_response['structured_response']}"
-            )
-            structured_generation_response: SQLGenerationResponse = generation_response[
-                "structured_response"
-            ]
-            sql = structured_generation_response.sql
-            final_sql = sql
-            logger.info(f"SQL: {sql}")
-            logger.info(f"Explanation: {structured_generation_response.explanation}")
-
-            # response_is_correct = True
-            # break
-            query_fixing_response = query_fixing_adapter.invoke(
-                {
-                    "messages": [
-                        {
-                            "role": Role.ASSISTANT,
-                            "content": PromptConstant.query_fixing_prompt.format(
-                                question=user_question,
-                                query=sql,
-                                dialect=app_config.database.dialect.upper(),
-                            ),
-                        }
-                    ]
-                },
-                config=chat_config,
-            )
-            if not query_fixing_response:
-                logger.error(f"Query fixing response is None")
-                continue
-            query_fixing_result = query_fixing_response["messages"][-1]
-            logger.info(f"Query fixing result: {query_fixing_result.content}")
-            structured_query_fixing_response: SQLQueryFixingResponse = (
-                query_fixing_response["structured_response"]
-            )
-            logger.info(
-                f"Query fixing structured result: {structured_query_fixing_response}"
-            )
-            if structured_query_fixing_response.is_correct:
-                logger.info(f"Query is correct")
-                response_is_correct = True
-            else:
-                logger.info(f"Query is incorrect")
-                logger.info(
-                    f"Explanation: {structured_query_fixing_response.explanation}"
-                )
-                generation_evidence = structured_query_fixing_response.explanation
-                response_is_correct = False
-
-        logger.info(f"Final SQL: {final_sql}")
-        if not response_is_correct:
-            logger.info(
-                f"Final resposne is correct: {response_is_correct}; Final explanation: {generation_evidence}"
-            )
-            print("Query is incorrect, please try again.")
+        success, final_sql = sql_generator.invoke(user_question, filtered_schema_tables)
+        if not success:
+            logger.error(f"SQL generation failed")
+            print("SQL generation failed")
             continue
 
-        logger.info(
-            f"Final resposne is correct: {response_is_correct}; Final explanation: {generation_evidence}"
-        )
+        try:
+            sql_result = db.run(final_sql)
+        except Exception as e:
+            logger.error(f"SQL execution failed: {e}")
+            print("SQL execution failed")
+            continue
+
         response_enhancement_response = response_enhancement_adapter.invoke(
             {
                 "messages": [
@@ -223,7 +129,8 @@ def cli():
                         "role": Role.ASSISTANT,
                         "content": PromptConstant.response_enhancement_prompt.format(
                             question=user_question,
-                            result=final_sql,
+                            sql_query=final_sql,
+                            result=sql_result,
                         ),
                     }
                 ]
@@ -232,6 +139,7 @@ def cli():
         )
         if not response_enhancement_response:
             logger.error(f"Response enhancement response is None")
+            print("Response enhancement response is None")
             continue
         response_enhancement_result = response_enhancement_response["messages"][-1]
         logger.info(

@@ -101,5 +101,5 @@ if __name__ == "__main__":
     print(settings.model_dump_json(indent=2))
 
 
-def get_config():
+def get_app_config():
     return settings

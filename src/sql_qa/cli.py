@@ -15,7 +15,7 @@ from shared.db import get_db
 
 # from sql_qa.config import DEFAULT_CONFIG
 from sql_qa.chat import gen_agent_executor
-from sql_qa.config import get_config
+from sql_qa.config import get_app_config
 from sql_qa.schema import (
     AssistantMessage,
     ChatCompletionRequest,
@@ -44,7 +44,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-config = get_config()
+config = get_app_config()
 # Initialize logger
 logger = get_logger(
     "main",

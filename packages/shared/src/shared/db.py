@@ -1,8 +1,8 @@
 from langchain_community.utilities import SQLDatabase
 from shared.logger import get_logger
-from sql_qa.config import get_config
+from sql_qa.config import get_app_config
 
-app_config = get_config()
+app_config = get_app_config()
 
 logger = get_logger(
     __name__,

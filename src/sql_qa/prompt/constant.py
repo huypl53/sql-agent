@@ -1,7 +1,7 @@
 from sql_qa.prompt.template import PromptTemplate, Role, TemplateMetadata
-from sql_qa.config import get_config
+from sql_qa.config import get_app_config
 
-app_config = get_config()
+app_config = get_app_config()
 
 
 class PromptConstant:
@@ -100,12 +100,15 @@ Nếu có bất kỳ lỗi nào trong số các lỗi trên, trả về `false`.
     )
     response_enhancement_prompt: PromptTemplate = PromptTemplate(
         template="""
-Bạn nhận được **KẾT QUẢ** câu truy vấn SQL và **CÂU HỎI** của người dùng. Hãy cải thiện kết quả sau khi truy vấn SQL cho phù hợp với câu hỏi của người dùng.
+Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn từ cơ sở dữ liệu, **CÂU HỎI** của người dùng và câu lệnh SQL đã được sử dụng. Hãy cải thiện **KẾT QUẢ GỐC** để tạo thành câu trả lời tự nhiên, dễ hiểu, phù hợp với **CÂU HỎI** của người dùng.
 
 **Câu hỏi của người dùng**: {question}
 
+**Câu lệnh SQL đã sử dụng**: {sql_query}
+
 **Kết quả truy vấn SQL**: {result}
-        
+
+**Kết quả cải thiện**:
         """,
     )
     user_prompt: PromptTemplate = PromptTemplate(

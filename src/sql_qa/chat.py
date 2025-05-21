@@ -6,10 +6,10 @@ from langgraph.graph.graph import CompiledGraph
 from typing import Generator, Tuple
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_community.utilities import SQLDatabase
-from sql_qa.config import get_config
+from sql_qa.config import get_app_config
 from shared.logger import get_logger
 
-config = get_config()
+config = get_app_config()
 logger = get_logger(__name__)
 
 # Global checkpointer instance
