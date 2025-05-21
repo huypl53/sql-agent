@@ -75,3 +75,6 @@ venv.bak/
 
 ./Chinook.db
 ./logs/*
+outputs/**
+
+data/

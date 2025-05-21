@@ -24,8 +24,8 @@ def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
 def get_logger(
     name: str,
     level: Optional[int] = None,
-    log_file: Optional[str] = None,
-    max_bytes: int = 5 * 1024 * 1024,  # 10MB default
+    log_file: Optional[str] = "./logs/",
+    max_bytes: int = 5 * 1024 * 1024,  # 5MB default
     backup_count: int = 5,  # Keep 5 backup files by default
 ) -> logging.Logger:
     """

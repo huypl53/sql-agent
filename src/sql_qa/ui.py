@@ -3,12 +3,10 @@ import streamlit as st
 from shared.logger import get_logger
 
 from sql_qa.chat import gen_agent_executor
-from sql_qa.config import get_config
 
-config = get_config()
-logger = get_logger(__name__, log_file="./log/")
+logger = get_logger(__name__, log_file="./logs/")
 
-from shared.db import db as mdb
+from shared.db import get_db
 
 
 st.title("Simple chat")
@@ -21,7 +19,9 @@ if "username" not in st.session_state:
 
 def run():
     username = st.session_state.username
+
     if "agent_executor" not in st.session_state:
+        mdb = get_db()
         agent_executor, checkpointer = next(gen_agent_executor(mdb))
         st.session_state.agent_executor = agent_executor
         st.session_state.checkpointer = checkpointer

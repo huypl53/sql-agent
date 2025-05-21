@@ -11,8 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 import uvicorn
-from omegaconf import OmegaConf
-from shared.db import db as mdb
+from shared.db import get_db
 
 # from sql_qa.config import DEFAULT_CONFIG
 from sql_qa.chat import gen_agent_executor
@@ -49,17 +48,17 @@ config = get_config()
 # Initialize logger
 logger = get_logger(
     "main",
-    logging.INFO,
+    config.logging.level,
     log_file=config.logging.log_dir,
     max_bytes=config.logging.max_bytes,
     backup_count=config.logging.backup_count,
 )
 logger.info(f"Working directory: {os.getcwd()}")
-logger.info(f"Configuration: {OmegaConf.to_yaml( config )}")
 
 # Initialize LLM and agent
 logger.info(f"LLM: {config.llm.provider} ({config.llm.model_provider})")
 
+mdb = get_db()
 agent_executor, checkpointer = next(gen_agent_executor(mdb))
 
 
@@ -81,7 +80,7 @@ async def chat_completions(request: ChatCompletionRequest):
         final_response = None
         for step in agent_executor.stream(
             # {"messages": [HumanMessage(content=last_message)]},
-            {"messages": request.messages[-10:]},
+            {"messages": request.model_dump()["messages"][-10:]},
             config=configurable,
             stream_mode="values",
         ):

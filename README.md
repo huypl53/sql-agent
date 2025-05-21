@@ -25,6 +25,50 @@ SQL-QA
 - Support for various SQL databases (MySQL, SQLite)
 - Verbose mode for debugging and understanding agent reasoning
 
+```mermaid
+
+sequenceDiagram
+    participant User
+    participant System as Text2SQL System
+    participant SchemaSelector
+    participant PromptEngine
+    participant Generator
+    participant Validator
+    participant Executor
+
+    Note over System: Main Flow with Optional Components
+
+    User->>System: "Show me all customers from California"
+    
+    Note right of System: 1. Schema Selection<br/>- Analyzes question<br/>- Selects relevant tables<br/>- Returns focused schema
+    System->>SchemaSelector: Find relevant tables
+    SchemaSelector-->>System: Selected tables (customers, addresses)
+    
+    Note right of System: 2. Prompt Construction<br/>- Builds LLM prompt<br/>- Optional: Add examples<br/>- Optional: Add metadata
+    System->>PromptEngine: Create prompt(question + schema)
+    Note over PromptEngine: Optional Features:<br/>• Few-shot examples<br/>• Chain-of-thought<br/>• Metadata enrichment
+    PromptEngine-->>System: Formatted prompt
+    
+    Note right of System: 3. SQL Generation<br/>- Multiple strategies (optional)<br/>- Multiple LLMs (optional)<br/>- Candidate ranking
+    System->>Generator: Generate SQL(prompt)
+    Note over Generator: Generation Options:<br/>• Direct generation<br/>• Chain-of-thought<br/>• Few-shot learning<br/>• Multiple candidates
+    Generator-->>System: SQL candidate(s)
+    
+    Note right of System: 4. Validation & Fixing<br/>- Syntax check<br/>- Schema validation<br/>- Auto-fix if needed
+    System->>Validator: Validate & fix SQL
+    Note over Validator: Validation Steps:<br/>• Syntax checking<br/>• Schema validation<br/>• Auto-fixing with LLM<br/>• Re-validation
+    Validator-->>System: Valid SQL
+    
+    Note right of System: 5. Execution<br/>- Safe execution<br/>- Result evaluation<br/>- Feedback collection
+    System->>Executor: Execute SQL
+    Note over Executor: Execution Features:<br/>• Query sanitization<br/>• Time limits<br/>• Result evaluation<br/>• Feedback collection
+    Executor-->>System: Query results
+    
+    System-->>User: Display results + SQL query
+    
+    Note over User, Executor: Optional Feedback Loop:<br/>User feedback → Example store → Improved future queries
+```
+
 ## Prerequisites
 
 - Python 3.10+

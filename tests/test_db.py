@@ -1,5 +1,5 @@
 import pytest
-from shared.db import db as mdb
+from shared.db import get_db as mdb
 
 
 @pytest.fixture
