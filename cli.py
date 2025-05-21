@@ -11,11 +11,11 @@ from sql_qa.prompt.constant import PromptConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import ApiAdapter
 from sql_qa.config import get_app_config
-from shared.logger import get_logger
+from shared.logger import get_main_logger
 
 from sql_qa.schema.store import Schema, SchemaStore
 
-logger = get_logger(__name__, log_file="./logs/cli.log")
+logger = get_main_logger(__name__, log_file="./logs/cli.log")
 
 app_config = get_app_config()
 logger.info(json.dumps(app_config.model_dump(), indent=4, ensure_ascii=False))

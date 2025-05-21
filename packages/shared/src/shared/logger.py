@@ -5,6 +5,9 @@ from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
+# Global main logger instance
+_main_logger = None
+
 
 def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
     """
@@ -21,12 +24,46 @@ def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
     return str(Path(log_dir) / f"{prefix}_{timestamp}.log")
 
 
+def get_main_logger(
+    name: str = "main",
+    level: Optional[int] = None,
+    log_file: Optional[str] = "./logs/",
+    max_bytes: int = 5 * 1024 * 1024,  # 5MB default
+    backup_count: int = 5,  # Keep 5 backup files by default
+) -> logging.Logger:
+    """
+    Get or create the main logger instance.
+
+    Args:
+        name: The name of the main logger (default: "main")
+        level: Optional logging level. If not provided, uses INFO level
+        log_file: Optional path to log file or directory
+        max_bytes: Maximum size of each log file before rotation
+        backup_count: Number of backup files to keep
+
+    Returns:
+        logging.Logger: The main logger instance
+    """
+    global _main_logger
+    if _main_logger is None:
+        _main_logger = get_logger(
+            name=name,
+            level=level,
+            log_file=log_file,
+            max_bytes=max_bytes,
+            backup_count=backup_count,
+            propagate=False,  # Main logger should not propagate to root
+        )
+    return _main_logger
+
+
 def get_logger(
     name: str,
     level: Optional[int] = None,
     log_file: Optional[str] = "./logs/",
     max_bytes: int = 5 * 1024 * 1024,  # 5MB default
     backup_count: int = 5,  # Keep 5 backup files by default
+    propagate: bool = True,  # Whether to propagate to main logger
 ) -> logging.Logger:
     """
     Get a configured logger instance.
@@ -38,13 +75,13 @@ def get_logger(
                  a timestamped log file will be created in that directory
         max_bytes: Maximum size of each log file before rotation (default: 10MB)
         backup_count: Number of backup files to keep (default: 5)
+        propagate: Whether to propagate logs to the main logger (default: True)
 
     Returns:
         logging.Logger: Configured logger instance
     """
     # Create logger
     logger = logging.getLogger(name)
-    logger.propagate = False  # Prevent propagation to parent loggers
 
     # If logger already has handlers, return it to avoid duplicate handlers
     if logger.handlers:
@@ -90,6 +127,13 @@ def get_logger(
         file_handler.setLevel(level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
+
+    # Set propagation to main logger
+    if propagate and _main_logger is not None:
+        logger.propagate = True
+        logger.parent = _main_logger
+    else:
+        logger.propagate = False
 
     return logger
 
