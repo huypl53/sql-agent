@@ -96,8 +96,8 @@ class ApiAdapter(BaseAdapter):
         return self.agent_executor.stream(*args, **kwargs)
 
     @tenacity.retry(
-        stop=tenacity.stop_after_attempt(1),
-        wait=tenacity.wait_exponential(multiplier=1, min=5, max=60),
+        stop=tenacity.stop_after_attempt(7),
+        wait=tenacity.wait_exponential(multiplier=1, min=7, max=60),
         retry=tenacity.retry_if_exception_type(Exception),
         reraise=True,
         retry_error_callback=on_llm_retry_fail,
