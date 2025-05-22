@@ -15,10 +15,10 @@ class PromptConstant:
     )
     _gen_suffix = """
     **Đầu vào**:
-    - Câu hỏi SQL: {{question}}
-    - Cấu trúc cơ sở dữ liệu: {{schema}}
-    - Bằng chứng: {{evidence}}
-    - Nhắc lại câu hỏi SQL: {{question}}
+    - Câu hỏi SQL: {question}
+    - Cấu trúc cơ sở dữ liệu: {schema}
+    - Bằng chứng: {evidence}
+    - Nhắc lại câu hỏi SQL: {question}
 
     --- 
     
@@ -26,7 +26,7 @@ class PromptConstant:
     - Câu lệnh SQL: 
     - Giải thích: 
     """
-    system_prompt: PromptTemplate = PromptTemplate(
+    system: PromptTemplate = PromptTemplate(
         template="""
 Là một quản trị viên cơ sở dữ liệu chuyên nghiệp và giàu kinh nghiệm, nhiệm vụ của bạn là phân tích câu hỏi của người dùng và lược đồ cơ sở dữ liệu {dialect} để cung cấp thông tin liên quan. Bạn được cung cấp `Câu hỏi` của người dùng và `Lược đồ DB` chứa cấu trúc cơ sở dữ liệu.
         """,
@@ -34,10 +34,10 @@ Là một quản trị viên cơ sở dữ liệu chuyên nghiệp và giàu kin
         metadata=TemplateMetadata(
             version="1.0",
             author="msc-sql",
-            tags=["system_prompt"],
+            tags=["system"],
         ),
     )
-    table_linking_prompt: PromptTemplate = PromptTemplate(
+    table_linking: PromptTemplate = PromptTemplate(
         template="""
 Hãy suy nghĩ từng bước. Xác định và liệt kê tất cả các tên bảng liên quan từ lược đồ DB dựa trên câu hỏi của người dùng và lược đồ cơ sở dữ liệu được cung cấp. Hãy đảm bảo bạn bao gồm tất cả các bảng liên quan.
 
@@ -56,7 +56,7 @@ Hãy suy nghĩ từng bước. Xác định và liệt kê tất cả các tên 
         ),
     )
 
-    direct_generation_prompt: PromptTemplate = PromptTemplate(
+    direct_generation: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 
@@ -87,7 +87,7 @@ Không suy đoán ngoài dữ liệu và schema đã cung cấp.
 {_gen_suffix}
         """,
     )
-    cot_generation_prompt: PromptTemplate = PromptTemplate(
+    cot_generation: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 
@@ -149,7 +149,7 @@ Dưới đây là một số ví dụ: {{examples}}
         """,
     )
 
-    dat_cot_genration_prompt = PromptTemplate(
+    dat_cot_genration = PromptTemplate(
         template=f"""
 {_gen_prefix}
 Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu lệnh SQL. Mục tiêu của bạn là tạo ra câu lệnh SQL chính xác, tối ưu, và đặc biệt là *cung cấp kết quả dễ hiểu, có ý nghĩa cho người dùng cuối*.
@@ -227,7 +227,7 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 """,
     )
 
-    qp_generation_prompt: PromptTemplate = PromptTemplate(
+    qp_generation: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu lệnh SQL. Nhiệm vụ của bạn là tạo ra một câu lệnh SQL chính xác, hiệu quả và *quan trọng nhất là cung cấp kết quả dễ đọc, có ý nghĩa cho người dùng cuối*.
@@ -299,7 +299,7 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 """,
     )
 
-    query_fixing_prompt: PromptTemplate = PromptTemplate(
+    query_fixing: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 
@@ -345,7 +345,7 @@ Dựa trên câu hỏi, lược đồ bảng và câu truy vấn trước đó, 
             tags=["query_fixing"],
         ),
     )
-    query_validation_prompt: PromptTemplate = PromptTemplate(
+    query_validation: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 **Mô tả nhiệm vụ**:
@@ -371,7 +371,7 @@ Bạn là chuyên gia SQL có nhiệm vụ kiểm tra tính hợp lệ của câ
 Nếu có bất kỳ lỗi nào trong số các lỗi trên, trả về `false`. Nếu không có lỗi nào, chỉ cần trả về `true`.
         """,
     )
-    response_enhancement_prompt: PromptTemplate = PromptTemplate(
+    response_enhancement: PromptTemplate = PromptTemplate(
         template="""
 Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn từ cơ sở dữ liệu, **CÂU HỎI** của người dùng và câu lệnh SQL đã được sử dụng. Hãy cải thiện **KẾT QUẢ GỐC** để tạo thành câu trả lời tự nhiên, dễ hiểu, phù hợp với **CÂU HỎI** của người dùng.
 
@@ -384,12 +384,40 @@ Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn t�
 **Kết quả cải thiện**:
         """,
     )
-    user_prompt: PromptTemplate = PromptTemplate(
+
+    merger: PromptTemplate = PromptTemplate(
+        template=f"""
+{_gen_prefix}
+
+**Mô tả nhiệm vụ**:
+Bạn là một chuyên gia SQL có nhiệm vụ tổng hợp các câu lệnh truy vấn SQL candidate thành một câu lệnh SQL cuối cùng. Dựa trên câu hỏi của người dùng, lược đồ cơ sở dữ liệu, và các câu lệnh SQL candidate được cung cấp, hãy phân tích và chọn ra câu lệnh SQL tốt nhất hoặc kết hợp các phần tốt nhất từ các candidate để tạo ra câu lệnh SQL cuối cùng.
+
+**Quy trình**:
+1. **Phân tích câu hỏi**: Đọc kỹ câu hỏi của người dùng để hiểu rõ yêu cầu.
+2. **Xem xét lược đồ cơ sở dữ liệu**: Kiểm tra cấu trúc cơ sở dữ liệu để đảm bảo câu lệnh SQL cuối cùng phù hợp với lược đồ.
+3. **Đánh giá các câu lệnh SQL candidate**:
+   - Kiểm tra tính chính xác của cú pháp.
+   - Đánh giá hiệu suất và tối ưu hóa.
+   - Xem xét khả năng cung cấp thông tin dễ hiểu và có ý nghĩa cho người dùng.
+4. **Tổng hợp câu lệnh SQL cuối cùng**:
+   - Chọn câu lệnh SQL tốt nhất từ các candidate.
+   - Hoặc kết hợp các phần tốt nhất từ các candidate để tạo ra câu lệnh SQL cuối cùng.
+5. **Kiểm tra lại**: Đảm bảo câu lệnh SQL cuối cùng đáp ứng đúng yêu cầu của câu hỏi và tuân thủ các nguyên tắc SQL.
+
+**Định dạng đầu ra**: Trình bày câu lệnh SQL cuối cùng dưới dạng một dòng mã SQL duy nhất, sau phần Kết quả cuối cùng. Đảm bảo không có ngắt dòng trong câu lệnh.
+
+**Các câu lệnh SQL candidate**:
+{{candidates}}
+
+**Kết quả cuối cùng**:
+        """,
+    )
+    user: PromptTemplate = PromptTemplate(
         template="{question}",
         role=Role.USER,
     )
 
-    assistant_prompt: PromptTemplate = PromptTemplate(
+    assistant: PromptTemplate = PromptTemplate(
         template="{sql_query}",
         role=Role.ASSISTANT,
     )

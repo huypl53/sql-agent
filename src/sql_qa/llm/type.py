@@ -19,8 +19,13 @@ class SQLGenerationResponse(LlmResponse):
     explanation: Optional[str]
 
 
-class SQLQueryFixingResponse(LlmResponse):
+class SQLQueryValidationResponse(LlmResponse):
     is_correct: bool
+    explanation: Optional[str]
+
+
+class SQLQueryFixerResponse(LlmResponse):
+    sql: str
     explanation: Optional[str]
 
 

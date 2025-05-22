@@ -15,14 +15,17 @@ from langgraph.store.base import BaseStore
 from langgraph.types import Checkpointer
 import tenacity
 
+from sql_qa.llm.base import InvokableBase
 from sql_qa.llm.util import on_llm_retry_fail
 
 from shared.logger import get_logger
 
 logger = get_logger(__name__, log_file=f"./logs/{__name__}.log")
 
+API_MODELS = ["gemini", "openai", "anthropic", "mistral"]
 
-class BaseAdapter(ABC):
+
+class BaseAdapter(InvokableBase, ABC):
     @abstractmethod
     def __init__(
         self,
@@ -66,20 +69,6 @@ class BaseAdapter(ABC):
     def _init_agent_executor(self):
         pass
 
-    @abstractmethod
-    def stream(self, *args: Any, **kwargs: Any) -> Any:
-        return self.agent_executor.stream(*args, **kwargs)
-
-    @abstractmethod
-    def invoke(
-        self,
-        input: Dict[str, Any],
-        *,
-        config: Optional[Dict[str, Any]] = None,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        pass
-
 
 class ApiAdapter(BaseAdapter):
     def __init__(self, **kwargs):
@@ -107,8 +96,8 @@ class ApiAdapter(BaseAdapter):
         return self.agent_executor.stream(*args, **kwargs)
 
     @tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=15),
+        stop=tenacity.stop_after_attempt(1),
+        wait=tenacity.wait_exponential(multiplier=1, min=5, max=60),
         retry=tenacity.retry_if_exception_type(Exception),
         reraise=True,
         retry_error_callback=on_llm_retry_fail,
@@ -117,7 +106,9 @@ class ApiAdapter(BaseAdapter):
                 f"Retry attempt {retry_state.attempt_number} due to error: {retry_state.outcome.exception()}"
             )
             if retry_state.outcome
-            else None
+            else logger.warning(
+                f"Retry attempt {retry_state.attempt_number} due to unknown error"
+            )
         ),
     )
     def invoke(self, *args, **kwargs: Any) -> Any:
@@ -173,4 +164,3 @@ class HuggingFaceAdapter(BaseAdapter):
 
     def invoke(self, *args, **kwargs: Any) -> Any:
         return self.agent_executor.invoke(*args, **kwargs)
-        pass

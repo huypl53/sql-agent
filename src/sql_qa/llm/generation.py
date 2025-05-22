@@ -1,9 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, Type
 
-from sql_qa.config import Settings, get_app_config
-from sql_qa.llm.adapter import ApiAdapter, BaseAdapter
-from sql_qa.llm.type import SQLGenerationResponse, SQLQueryFixingResponse
+from sql_qa.config import get_app_config
+from sql_qa.llm.adapter import API_MODELS, ApiAdapter, BaseAdapter, HuggingFaceAdapter
+from sql_qa.llm.type import (
+    SQLGenerationResponse,
+    SQLQueryFixerResponse,
+    SQLQueryValidationResponse,
+)
 from sql_qa.prompt.constant import PromptConstant
 
 from shared.logger import get_logger
@@ -15,44 +18,76 @@ logger = get_logger(__name__, log_file=f"./logs/{__name__}.log")
 app_config = get_app_config()
 
 
-class LLMBaseGeneration(ABC):
-    def __init__(self, chat_config: dict):
+def get_adapter_class(model: str) -> Type[BaseAdapter]:
+    if [m for m in API_MODELS if m in model]:
+        return ApiAdapter
+    else:
+        return HuggingFaceAdapter
+
+
+class LLMGeneration:
+    def __init__(
+        self,
+        chat_config: dict,
+        prompt_type: str,
+        query_validation_kwargs: dict,
+        query_fixer_kwargs: dict,
+        generation_kwargs: dict,
+    ):
+
         self.chat_config = chat_config
         self.tools = []
+        self.prompt_type = prompt_type
 
-        self.query_fixing_adapter = ApiAdapter(
-            model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        # model: str = query_validation_kwargs.get("model")
+        self.query_validation_adapter = get_adapter_class(
+            query_validation_kwargs.get("model")
+        )(
+            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
             tools=self.tools,
-            prompt=PromptConstant.system_prompt.format(
+            prompt=PromptConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
-            response_format=SQLQueryFixingResponse,
+            response_format=SQLQueryValidationResponse,
+            **query_validation_kwargs,
             # checkpointer=checkpointer,
         )
 
-        self.generation_adapter: BaseAdapter = None
-
-    @abstractmethod
-    def invoke(self, query: str, schema: str, llm: BaseAdapter) -> str:
-        pass
-
-
-class LLMDirectGeneration(LLMBaseGeneration):
-    def __init__(self, chat_config: dict):
-        super().__init__(chat_config)
-
-        self.generation_adapter = ApiAdapter(
-            model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        # model: str = query_fixer_kwargs.get("model")
+        self.query_fixer_adapter = get_adapter_class(query_fixer_kwargs.get("model"))(
+            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
             tools=self.tools,
-            prompt=PromptConstant.system_prompt.format(
+            prompt=PromptConstant.system.format(
+                dialect=app_config.database.dialect.upper()
+            ),
+            response_format=SQLQueryFixerResponse,
+            **query_fixer_kwargs,
+            # checkpointer=checkpointer,
+        )
+
+        # model: str = generation_kwargs.get("model")
+        self.generation_adapter = get_adapter_class(generation_kwargs.get("model"))(
+            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
+            tools=self.tools,
+            prompt=PromptConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
             response_format=SQLGenerationResponse,
-            # checkpointer=checkpointer,
-            # pre_model_hook=trimmer,
+            **generation_kwargs,
         )
 
     def invoke(self, user_question: str, schema: str) -> Tuple[bool, str]:
+        """Invokes the SQL generation process for a given user question and schema.
+
+        This method attempts to generate a valid SQL query based on the user's question and the provided schema. It iteratively generates a SQL query, validates it, and fixes any issues up to three times. If a valid query is generated, it returns the query; otherwise, it returns an explanation of the failure.
+
+        Args:
+            user_question (str): The question posed by the user that requires a SQL query.
+            schema (str): The database schema to be used for generating the SQL query.
+
+        Returns:
+            Tuple[bool, str]: A tuple containing a boolean indicating whether the generated SQL query is correct and a string representing either the final SQL query or an explanation of the failure.
+        """
         try:
             run_iter = 0
             response_is_correct = False
@@ -68,7 +103,7 @@ class LLMDirectGeneration(LLMBaseGeneration):
                         "messages": [
                             {
                                 "role": Role.ASSISTANT,
-                                "content": PromptConstant.direct_generation_prompt.format(
+                                "content": PromptConstant.direct_generation.format(
                                     question=user_question,
                                     evidence=generation_evidence,
                                     schema=schema,
@@ -98,12 +133,12 @@ class LLMDirectGeneration(LLMBaseGeneration):
 
                 # response_is_correct = True
                 # break
-                query_fixing_response = self.query_fixing_adapter.invoke(
+                query_validation_response = self.query_validation_adapter.invoke(
                     {
                         "messages": [
                             {
                                 "role": Role.ASSISTANT,
-                                "content": PromptConstant.query_fixing_prompt.format(
+                                "content": PromptConstant.query_validation.format(
                                     question=user_question,
                                     query=sql,
                                     dialect=app_config.database.dialect.upper(),
@@ -113,26 +148,29 @@ class LLMDirectGeneration(LLMBaseGeneration):
                     },
                     config=self.chat_config,
                 )
-                if not query_fixing_response:
+                if not query_validation_response:
                     logger.error(f"Query fixing response is None")
                     continue
-                query_fixing_result = query_fixing_response["messages"][-1]
-                logger.info(f"Query fixing result: {query_fixing_result.content}")
-                structured_query_fixing_response: SQLQueryFixingResponse = (
-                    query_fixing_response["structured_response"]
+                query_validation_result = query_validation_response["messages"][-1]
+                logger.info(f"Query fixing result: {query_validation_result.content}")
+                structured_query_validation_response: SQLQueryValidationResponse = (
+                    query_validation_response["structured_response"]
                 )
                 logger.info(
-                    f"Query fixing structured result: {structured_query_fixing_response}"
+                    f"Query fixing structured result: {structured_query_validation_response}"
                 )
-                if structured_query_fixing_response.is_correct:
+                if structured_query_validation_response.is_correct:
                     logger.info(f"Query is correct")
                     response_is_correct = True
+                    generation_evidence = ""
                 else:
                     logger.info(f"Query is incorrect")
                     logger.info(
-                        f"Explanation: {structured_query_fixing_response.explanation}"
+                        f"Explanation: {structured_query_validation_response.explanation}"
                     )
-                    generation_evidence = structured_query_fixing_response.explanation
+                    generation_evidence = (
+                        structured_query_validation_response.explanation
+                    )
                     response_is_correct = False
 
             logger.info(f"Final SQL: {final_sql}")

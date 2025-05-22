@@ -7,7 +7,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from shared.logger import get_main_logger
 
 from shared.db import get_db
-from sql_qa.llm.generation import LLMDirectGeneration
+from sql_qa.llm.generation import LLMGeneration
+from sql_qa.llm.strategy import StategyFactory
 from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
 from sql_qa.prompt.constant import PromptConstant
 from sql_qa.prompt.template import Role
@@ -45,7 +46,7 @@ def cli():
     schema_linking_adapter = ApiAdapter(
         model=f"{app_config.llm.provider}:{app_config.llm.model}",
         tools=tools,
-        prompt=PromptConstant.system_prompt.format(
+        prompt=PromptConstant.system.format(
             dialect=app_config.database.dialect.upper()
         ),
         response_format=SqlLinkingTablesResponse,
@@ -55,14 +56,14 @@ def cli():
     response_enhancement_adapter = ApiAdapter(
         model=f"{app_config.llm.provider}:{app_config.llm.model}",
         tools=tools,
-        prompt=PromptConstant.system_prompt.format(
+        prompt=PromptConstant.system.format(
             dialect=app_config.database.dialect.upper()
         ),
         response_format=SqlResponseEnhancementResponse,
         # checkpointer=checkpointer,
     )
 
-    sql_generator = LLMDirectGeneration(chat_config)
+    # sql_generator = LLMGeneration(chat_config)
     schema = Schema.load(app_config.schema_path)
     schema_store = SchemaStore()
     schema_store.add_schema(schema)
@@ -78,7 +79,7 @@ def cli():
                 "messages": [
                     {
                         "role": Role.USER,
-                        "content": PromptConstant.table_linking_prompt.format(
+                        "content": PromptConstant.table_linking.format(
                             question=user_question,
                             schema=list(schema_store.schemas.values())[0].model_dump(
                                 mode="json"
@@ -108,7 +109,16 @@ def cli():
             f"filtered_schema_tables: {[t.name for s in filtered_schema_tables.values() for t in s.tables if s]}"
         )
 
-        success, final_sql = sql_generator.invoke(user_question, filtered_schema_tables)
+        # success, final_sql = sql_generator.invoke(user_question, filtered_schema_tables)
+        strategy = StategyFactory(return_all=False)
+        strategy_results = strategy.generate(user_question, filtered_schema_tables)
+
+        if not any(strategy_results):
+            logger.error(f"SQL generation failed")
+            print("SQL generation failed")
+            continue
+        success, final_sql = strategy_results[0]
+
         if not success:
             logger.error(f"SQL generation failed")
             print("SQL generation failed")
@@ -127,7 +137,7 @@ def cli():
                 "messages": [
                     {
                         "role": Role.ASSISTANT,
-                        "content": PromptConstant.response_enhancement_prompt.format(
+                        "content": PromptConstant.response_enhancement.format(
                             question=user_question,
                             sql_query=final_sql,
                             result=sql_result,
@@ -145,7 +155,7 @@ def cli():
         logger.info(
             f"Response enhancement result: {response_enhancement_result.content}"
         )
-        print(response_enhancement_result.content)
+        print(f"Bot: f{response_enhancement_result.content}")
 
 
 def extract_table_name_list(text):

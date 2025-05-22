@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic_settings import (
     BaseSettings,
     DotEnvSettingsSource,
@@ -56,6 +56,13 @@ class _Logging(BaseSettings):
     )
 
 
+class ObjectDefinition(BaseSettings):
+    model_config = ConfigDict(extra="allow")
+    # kwargs: Optional[Dict[str, Union[Any, "ObjectDefinition"]]] = Field(
+    #     default_factory=dict,
+    # )
+
+
 class Settings(BaseSettings):
     model_config = ConfigDict(extra="allow")
     schema_path: str = Field(
@@ -64,6 +71,7 @@ class Settings(BaseSettings):
     logging: _Logging = _Logging()
     database: _Database = _Database()
     llm: _LLM = _LLM()
+    candidate_generations: List[Any]
 
     @classmethod
     def settings_customise_sources(

@@ -4,3 +4,30 @@ server:
   log_level: "info"
   reload: true
   workers: 1
+
+candidate_generations:
+  - 
+    prompt_type: "direct_generation"
+    query_validation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+      # temperature: 1.0
+      # max_tokens: 1000
+      # top_p: 1.0
+      # frequency_penalty: 0.0
+      # presence_penalty: 0.0
+      # stop: null
+    generation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    query_fixer_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+  -
+    prompt_type: "cot_generation"
+    query_validation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    generation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    query_fixer_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+
+merger:
+  model: "google_genai:gemini-2.0-flash"
