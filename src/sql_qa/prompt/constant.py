@@ -227,6 +227,78 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 """,
     )
 
+    qp_generation_prompt: PromptTemplate = PromptTemplate(
+        template=f"""
+{_gen_prefix}
+Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu lệnh SQL. Nhiệm vụ của bạn là tạo ra một câu lệnh SQL chính xác, hiệu quả và *quan trọng nhất là cung cấp kết quả dễ đọc, có ý nghĩa cho người dùng cuối*.
+
+**Những Nguyên tắc Quan trọng Chung:**
+1.  Chỉ sử dụng các bảng cần thiết để giải quyết nhiệm vụ.
+2.  Sử dụng "Cấu trúc cơ sở dữ liệu" và "Bằng chứng" để lập luận, xác định các mối quan hệ và ý nghĩa dữ liệu.
+3.  Đảm bảo sử dụng các từ khóa SQL (DISTINCT, WHERE, GROUP BY, ORDER BY, LIMIT, JOIN, Subqueries/CTEs) khi cần thiết.
+4.  **Ưu tiên Hiển thị Thông tin Dễ Đọc và Ý Nghĩa (User-Friendly Output):**
+    *   Khi chọn các cột để hiển thị trong câu lệnh `SELECT` cuối cùng, *luôn ưu tiên* các cột mang ý nghĩa, dễ đọc và cung cấp thông tin trực quan (ví dụ: `name`, `title`, `description`, `fullname`, `email`, `product_name`, `category_name`, `order_date`, `status`, `address`, `phone_number`).
+    *   Nếu một bảng không có cột mô tả trực tiếp nhưng có thể tham chiếu đến một bảng khác để lấy thông tin mô tả liên quan (ví dụ: `product_variant` cần `product.name`), hãy thực hiện các thao tác JOIN cần thiết và chọn cột mô tả từ bảng liên quan.
+    *   Chỉ trả về các cột ID nếu câu hỏi SQL yêu cầu *cụ thể* ID, hoặc nếu không có bất kỳ cột mô tả nào khác phù hợp.
+    *   Sử dụng `AS` (Alias) để đặt tên cột thân thiện hơn nếu tên gốc khó hiểu (ví dụ: `client.A11 AS average_salary_branch`).
+
+---
+
+**Cấu trúc cơ sở dữ liệu:** {{schema}}
+**Bằng chứng (Các bản ghi mẫu và mô tả cột):** {{evidence}}
+
+**Câu hỏi SQL:** {{question}}
+**Gợi ý (nếu có):** {{hint}}
+
+---
+
+**Quá trình suy nghĩ theo Kế hoạch Truy vấn (Query Plan - Chain-of-Thought):**
+
+**1. Phân tích Yêu cầu và Xác định Mục tiêu:**
+*   Đọc kỹ câu hỏi: "{{question}}"
+*   Xác định mục tiêu chính của câu hỏi: Người dùng muốn biết thông tin gì?
+*   Xác định các thực thể chính và điều kiện liên quan.
+*   **Xác định Output Mong muốn (theo Nguyên tắc 4):** Những loại thông tin (tên, mô tả, số lượng, v.v.) nào cần được hiển thị cho người dùng cuối và chúng sẽ đến từ những bảng nào?
+
+**2. Xây dựng Kế hoạch Truy vấn (Query Plan):**
+*   Hãy tưởng tượng bạn là một công cụ tối ưu hóa truy vấn của cơ sở dữ liệu. Hãy phác thảo các bước mà hệ thống sẽ thực hiện để xử lý câu hỏi này, từ việc truy cập dữ liệu thô đến việc tạo ra kết quả cuối cùng.
+
+*   **2.1. Giai đoạn Chuẩn bị & Khởi tạo:**
+    *   Xác định các bảng dữ liệu gốc cần được truy cập ngay từ đầu.
+    *   Mô tả cách "mở" các bảng này và "khởi tạo" các biến hoặc vùng nhớ tạm thời .
+    *   Xác định các giá trị cố định (literal values) cần tìm kiếm .
+
+*   **2.2. Giai đoạn Lọc và Kết nối Dữ liệu (JOIN & WHERE Logic):**
+    *   Mô tả luồng dữ liệu khi nó được lọc ban đầu.
+    *   Giải thích các điều kiện `WHERE` sẽ được áp dụng cho từng bảng.
+    *   Chi tiết cách các bảng sẽ được `JOIN` với nhau, và lý do cho mỗi `JOIN`.
+    *   Mô tả thứ tự các phép lọc và kết nối.
+    *   Trong bước này, các cột được chọn có thể là ID hoặc các cột cần thiết cho việc lọc/JOIN tiếp theo, không nhất thiết là các cột hiển thị cuối cùng.
+
+*   **2.3. Giai đoạn Xử lý Dữ liệu (Nhóm, Tổng hợp, Sắp xếp, Giới hạn):**
+    *   Nếu câu hỏi yêu cầu thống kê (ví dụ: đếm, tổng, trung bình), mô tả cách các phép toán tổng hợp (`COUNT`, `SUM`, `AVG`, `MAX`, `MIN`) sẽ được áp dụng.
+    *   Xác định các cột dùng để nhóm (`GROUP BY`).
+    *   Giải thích cách dữ liệu sẽ được sắp xếp (`ORDER BY`) và giới hạn (`LIMIT`) nếu có yêu cầu.
+
+*   **2.4. Giai đoạn Lựa chọn Cột Cuối cùng và Định dạng (Final SELECT & Presentation):**
+    *   **Đây là bước quyết định để áp dụng Nguyên tắc 4.** Dựa trên tất cả dữ liệu đã được xử lý và lọc ở các bước trước, hãy xác định *chính xác* các cột sẽ được đưa vào mệnh đề `SELECT` cuối cùng.
+    *   Lập luận về việc chọn các cột dễ đọc, có ý nghĩa (`name`, `fullname`, v.v.) thay vì ID.
+    *   Nếu cần JOIN để lấy thông tin mô tả (ví dụ: từ `product_variant` lấy `product.name`), hãy đảm bảo bước này đã được mô tả ở 2.2 và kết quả `name` được chọn ở đây.
+    *   Đề xuất sử dụng `AS` để đặt biệt danh thân thiện cho các cột nếu cần.
+
+*   **2.5. Giai đoạn Kết thúc & Trả Về Kết quả:**
+    *   Mô tả cách kết quả cuối cùng được trả về.
+
+**3. Tổng hợp Câu lệnh SQL:**
+*   Kết hợp tất cả các bước trong Query Plan thành một câu lệnh SQL hoàn chỉnh, tối ưu.
+*   Đảm bảo câu lệnh tuân thủ tất cả các "Nguyên tắc Quan trọng Chung", đặc biệt là về việc lựa chọn cột hiển thị và các Alias (AS) đã đề xuất.
+*   Kiểm tra lại tính đúng đắn và hiệu quả.
+
+---
+{_gen_suffix}
+""",
+    )
+
     query_fixing_prompt: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
