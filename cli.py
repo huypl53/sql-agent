@@ -4,6 +4,8 @@ from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.messages import trim_messages
 from langgraph.checkpoint.memory import MemorySaver
+from shared.logger import get_main_logger
+
 from shared.db import get_db
 from sql_qa.llm.generation import LLMDirectGeneration
 from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
@@ -11,7 +13,6 @@ from sql_qa.prompt.constant import PromptConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import ApiAdapter
 from sql_qa.config import get_app_config
-from shared.logger import get_main_logger
 
 from sql_qa.schema.store import Schema, SchemaStore
 
@@ -102,9 +103,7 @@ def cli():
         table_names = structured_linking_response.tables
         logger.info(f"Table names: {table_names}")
 
-        filtered_schema_tables = schema_store.search_tables(
-            table_names, mode="connected"
-        )
+        filtered_schema_tables = schema_store.search_tables(table_names, mode="same")
         logger.info(
             f"filtered_schema_tables: {[t.name for s in filtered_schema_tables.values() for t in s.tables if s]}"
         )
@@ -117,6 +116,7 @@ def cli():
 
         try:
             sql_result = db.run(final_sql)
+            logger.info(f"SQL result: {sql_result}")
         except Exception as e:
             logger.error(f"SQL execution failed: {e}")
             print("SQL execution failed")

@@ -46,7 +46,7 @@ class SchemaStore(BaseModel):
     def search_tables(
         self,
         queries: List[str],
-        mode: Literal["exact", "connected"] = "exact",
+        mode: Literal["exact", "connected", "same"] = "same",
         include_foreign_keys: bool = False,
     ) -> Dict[str, Schema]:
         """
@@ -67,6 +67,9 @@ class SchemaStore(BaseModel):
         for schema_name, schema in self.schemas.items():
             for table in schema.tables:
                 for query in queries:
+                    if mode == "same":
+                        matching_tables[schema_name].add(table.name)
+                        continue
                     if query.lower() in table.name.lower():
                         matching_tables[schema_name].add(table.name)
 
