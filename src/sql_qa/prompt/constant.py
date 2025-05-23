@@ -48,7 +48,7 @@ Hãy suy nghĩ từng bước. Xác định và liệt kê tất cả các tên 
 **Kết quả**:
 - Trả về danh sách tên các bảng liên quan được phân cách bằng dấu phẩy theo định dạng: "bảng1, bảng2, bảng3"
         """,
-        role=Role.ASSISTANT,
+        role=Role.USER,
         metadata=TemplateMetadata(
             version="1.0",
             author="msc-sql",
@@ -86,6 +86,7 @@ Không suy đoán ngoài dữ liệu và schema đã cung cấp.
 
 {_gen_suffix}
         """,
+        role=Role.USER,
     )
     cot_generation: PromptTemplate = PromptTemplate(
         template=f"""
@@ -147,6 +148,7 @@ Dưới đây là một số ví dụ: {{examples}}
 
 {_gen_suffix}
         """,
+        role=Role.USER,
     )
 
     dat_cot_genration = PromptTemplate(
@@ -225,9 +227,10 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 ---
 {_gen_suffix}
 """,
+        role=Role.USER,
     )
 
-    qp_generation: PromptTemplate = PromptTemplate(
+    query_plan_generation: PromptTemplate = PromptTemplate(
         template=f"""
 {_gen_prefix}
 Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu lệnh SQL. Nhiệm vụ của bạn là tạo ra một câu lệnh SQL chính xác, hiệu quả và *quan trọng nhất là cung cấp kết quả dễ đọc, có ý nghĩa cho người dùng cuối*.
@@ -297,6 +300,7 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 ---
 {_gen_suffix}
 """,
+        role=Role.USER,
     )
 
     query_fixing: PromptTemplate = PromptTemplate(
@@ -338,7 +342,7 @@ Câu hỏi gốc là:
 Dựa trên câu hỏi, lược đồ bảng và câu truy vấn trước đó, phân tích kết quả và cố gắng sửa câu truy vấn.       
 
         """,
-        role=Role.SYSTEM,
+        role=Role.USER,
         metadata=TemplateMetadata(
             version="1.0",
             author="msc-sql",
@@ -375,14 +379,36 @@ Nếu có bất kỳ lỗi nào trong số các lỗi trên, trả về `false`.
         template="""
 Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn từ cơ sở dữ liệu, **CÂU HỎI** của người dùng và câu lệnh SQL đã được sử dụng. Hãy cải thiện **KẾT QUẢ GỐC** để tạo thành câu trả lời tự nhiên, dễ hiểu, phù hợp với **CÂU HỎI** của người dùng.
 
+**QUY TẮC BẮT BUỘC**: 
+1. Xử lý kết quả rỗng:
+   - Nếu kết quả truy vấn là rỗng (không có dữ liệu), BẮT BUỘC phải trả lời: "Không tìm thấy dữ liệu phù hợp với yêu cầu của bạn."
+   - TUYỆT ĐỐI KHÔNG được tự ý tạo ra hoặc giả định dữ liệu khi kết quả là rỗng.
+   - KHÔNG được thêm các thông tin không có trong kết quả truy vấn.
+
+2. Sử dụng dữ liệu:
+   - CHỈ được sử dụng dữ liệu từ kết quả truy vấn được cung cấp.
+   - KHÔNG được sử dụng bất kỳ thông tin nào từ bên ngoài kết quả truy vấn.
+   - KHÔNG được sử dụng kết quả truy vấn cũ hoặc dữ liệu tri thức cá nhân.
+
+3. Xử lý lỗi:
+   - Nếu có lỗi trong quá trình truy vấn, phải thông báo lỗi một cách rõ ràng.
+   - KHÔNG được giả định hoặc tạo ra kết quả khi có lỗi.
+
+4. Phong cách trả lời:
+   - Trả lời phải lịch sự và chuyên nghiệp.
+   - Sử dụng ngôn ngữ dễ hiểu, phù hợp với người dùng.
+   - Trình bày thông tin một cách có cấu trúc và logic.
+
 **Câu hỏi của người dùng**: {question}
 
-**Câu lệnh SQL đã sử dụng**: {sql_query}
+**Câu lệnh SQL đã sử dụng**: 
+```sql
+{sql_query}
+```
 
 **Kết quả truy vấn SQL**: {result}
-
-**Kết quả cải thiện**:
         """,
+        role=Role.USER,
     )
 
     merger: PromptTemplate = PromptTemplate(
@@ -411,6 +437,7 @@ Bạn là một chuyên gia SQL có nhiệm vụ tổng hợp các câu lệnh t
 
 **Kết quả cuối cùng**:
         """,
+        role=Role.USER,
     )
     user: PromptTemplate = PromptTemplate(
         template="{question}",

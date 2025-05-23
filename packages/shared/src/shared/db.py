@@ -6,7 +6,6 @@ app_config = get_app_config()
 
 logger = get_logger(
     __name__,
-    log_file=f"{app_config.logging.log_dir}/{__name__}.log",
     level=app_config.logging.level,
 )
 

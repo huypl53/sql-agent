@@ -10,6 +10,7 @@ from pydantic_settings import (
 from pydantic import ConfigDict, Field
 import os
 from dotenv import load_dotenv
+from shared.logger import TurnLogger
 
 load_dotenv(override=True)
 
@@ -56,22 +57,45 @@ class _Logging(BaseSettings):
     )
 
 
-class ObjectDefinition(BaseSettings):
+class LlmConfig(BaseSettings):
     model_config = ConfigDict(extra="allow")
-    # kwargs: Optional[Dict[str, Union[Any, "ObjectDefinition"]]] = Field(
-    #     default_factory=dict,
-    # )
+
+    model: str = Field(
+        default="google_genai:gemini-2.0-flash",
+    )
+
+
+class GenerationConfig(BaseSettings):
+    model_config = ConfigDict(extra="allow")
+
+    prompt_type: str = Field()
+    query_validation_kwargs: LlmConfig
+    generation_kwargs: LlmConfig
+    query_fixer_kwargs: LlmConfig
 
 
 class Settings(BaseSettings):
     model_config = ConfigDict(extra="allow")
+    mode: Literal["dev", "prod", "benchmark"] = Field(
+        default="dev",
+        alias="MODE",
+    )
+
     schema_path: str = Field(
         alias="SCHEMA_PATH",
     )
     logging: _Logging = _Logging()
     database: _Database = _Database()
     llm: _LLM = _LLM()
-    candidate_generations: List[Any]
+    candidate_generations: List[GenerationConfig]
+
+    result_enhancement: LlmConfig
+    schema_linking: LlmConfig
+    merger: LlmConfig
+    turn_log_file: str = Field(
+        default="./logs/turn_log.csv",
+        alias="TURN_LOG_FILE",
+    )
 
     @classmethod
     def settings_customise_sources(
@@ -104,6 +128,8 @@ class Settings(BaseSettings):
 settings = Settings()
 if not os.path.exists(settings.logging.log_dir):
     os.makedirs(settings.logging.log_dir)
+
+turn_logger = TurnLogger(settings.turn_log_file)
 
 if __name__ == "__main__":
     print(settings.model_dump_json(indent=2))

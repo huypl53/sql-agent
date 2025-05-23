@@ -10,10 +10,11 @@ from sql_qa.llm.type import (
 from sql_qa.prompt.constant import PromptConstant
 
 from shared.logger import get_logger
+from sql_qa.config import turn_logger
 
 from sql_qa.prompt.template import Role
 
-logger = get_logger(__name__, log_file=f"./logs/{__name__}.log")
+logger = get_logger(__name__)
 
 app_config = get_app_config()
 
@@ -98,20 +99,30 @@ class LLMGeneration:
                     f"Run iteration: {run_iter}; Evidence: {generation_evidence}; Response is correct: {response_is_correct}"
                 )
                 run_iter += 1
+                direct_generation_prompt = PromptConstant.direct_generation.format(
+                    question=user_question,
+                    evidence=generation_evidence,
+                    schema=schema,
+                )
+                turn_logger.log(
+                    "direct_generation_prompt",
+                    f"---retry {run_iter}--- \n" f" {direct_generation_prompt}",
+                )
                 generation_response = self.generation_adapter.invoke(
                     {
                         "messages": [
                             {
-                                "role": Role.ASSISTANT,
-                                "content": PromptConstant.direct_generation.format(
-                                    question=user_question,
-                                    evidence=generation_evidence,
-                                    schema=schema,
-                                ),
+                                "role": Role.USER,
+                                "content": direct_generation_prompt,
                             }
                         ]
                     },
                     config=self.chat_config,
+                )
+                turn_logger.log(
+                    "generation_response",
+                    f"---retry {run_iter}--- \n"
+                    f" {generation_response['structured_response'] if generation_response else 'None'}",
                 )
                 if not generation_response:
                     logger.error(f"Generation response is None")
@@ -133,20 +144,30 @@ class LLMGeneration:
 
                 # response_is_correct = True
                 # break
+                query_validation_prompt = PromptConstant.query_validation.format(
+                    question=user_question,
+                    query=sql,
+                    dialect=app_config.database.dialect.upper(),
+                )
+                turn_logger.log(
+                    "query_validation_prompt",
+                    f"---retry {run_iter}--- \n" f" {query_validation_prompt}",
+                )
                 query_validation_response = self.query_validation_adapter.invoke(
                     {
                         "messages": [
                             {
-                                "role": Role.ASSISTANT,
-                                "content": PromptConstant.query_validation.format(
-                                    question=user_question,
-                                    query=sql,
-                                    dialect=app_config.database.dialect.upper(),
-                                ),
+                                "role": Role.USER,
+                                "content": query_validation_prompt,
                             }
                         ]
                     },
                     config=self.chat_config,
+                )
+                turn_logger.log(
+                    "query_validation_response",
+                    f"---retry {run_iter}--- \n"
+                    f" {query_validation_response['structured_response'] if query_validation_response else 'None'}",
                 )
                 if not query_validation_response:
                     logger.error(f"Query fixing response is None")
@@ -157,7 +178,7 @@ class LLMGeneration:
                     query_validation_response["structured_response"]
                 )
                 logger.info(
-                    f"Query fixing structured result: {structured_query_validation_response}"
+                    f"Query validation structured result: {structured_query_validation_response}"
                 )
                 if structured_query_validation_response.is_correct:
                     logger.info(f"Query is correct")
@@ -182,6 +203,10 @@ class LLMGeneration:
                 return False, generation_evidence
             logger.info(
                 f"Final resposne is correct: {response_is_correct}; Final explanation: {generation_evidence}"
+            )
+            turn_logger.log(
+                "final_sql",
+                f"---retry {run_iter}--- \n" f" {final_sql}",
             )
             return True, final_sql
 

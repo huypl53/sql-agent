@@ -1,6 +1,5 @@
 .qodo
 ./outputs/
-./logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -74,7 +73,7 @@ venv.bak/
 *.local
 
 ./Chinook.db
-./logs/*
+logs
 outputs/**
 
 data/

@@ -1,7 +1,7 @@
 from shared.logger import get_logger
 from tenacity import RetryCallState
 
-logger = get_logger(__name__, log_file=f"./logs/{__name__}.log")
+logger = get_logger(__name__)
 
 
 def on_llm_retry_fail(retry_state: RetryCallState) -> None:

@@ -4,6 +4,8 @@ from typing import Optional
 from pathlib import Path
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
+import csv
+import os
 
 # Global main logger instance
 _main_logger = None
@@ -37,7 +39,9 @@ def get_main_logger(
     Args:
         name: The name of the main logger (default: "main")
         level: Optional logging level. If not provided, uses INFO level
-        log_file: Optional path to log file or directory
+        log_file: Path to log file or directory. If directory is provided,
+                 a timestamped log file will be created in that directory.
+                 If a specific file path is provided, that exact file will be used.
         max_bytes: Maximum size of each log file before rotation
         backup_count: Number of backup files to keep
 
@@ -60,10 +64,11 @@ def get_main_logger(
 def get_logger(
     name: str,
     level: Optional[int] = None,
-    log_file: Optional[str] = "./logs/",
+    log_file: Optional[str] = None,
     max_bytes: int = 5 * 1024 * 1024,  # 5MB default
     backup_count: int = 5,  # Keep 5 backup files by default
     propagate: bool = True,  # Whether to propagate to main logger
+    use_console: bool = True,  # Whether to use console handler
 ) -> logging.Logger:
     """
     Get a configured logger instance.
@@ -72,10 +77,12 @@ def get_logger(
         name: The name of the logger (typically __name__ of the calling module)
         level: Optional logging level. If not provided, uses INFO level
         log_file: Optional path to log file or directory. If directory is provided,
-                 a timestamped log file will be created in that directory
+                 a timestamped log file will be created in that directory.
+                 If a specific file path is provided, that exact file will be used.
         max_bytes: Maximum size of each log file before rotation (default: 10MB)
         backup_count: Number of backup files to keep (default: 5)
         propagate: Whether to propagate logs to the main logger (default: True)
+        use_console: Whether to use console handler (default: True)
 
     Returns:
         logging.Logger: Configured logger instance
@@ -100,25 +107,22 @@ def get_logger(
     )
 
     # Create console handler with formatting
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    if use_console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
     # Add file handler if log_file is provided
     if log_file:
-        # If log_file is a directory, create a timestamped log file
         log_path = Path(log_file)
-        if (
-            log_path.is_dir()
-            or str(log_path).endswith("/")
-            or str(log_path).endswith("\\")
-        ):
-            log_path.mkdir(parents=True, exist_ok=True)
+
+        # Create parent directory if it doesn't exist
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # If path ends with / or \, use timestamped file
+        if log_path.is_dir() or str(log_path).endswith(("/", "\\")):
             log_file = get_timestamped_log_file(str(log_path), prefix=name)
-        else:
-            # Create parent directory if it doesn't exist
-            log_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Use RotatingFileHandler instead of FileHandler
         file_handler = RotatingFileHandler(
@@ -128,14 +132,87 @@ def get_logger(
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
-    # Set propagation to main logger
-    if propagate and _main_logger is not None:
-        logger.propagate = True
-        logger.parent = _main_logger
+    # Set up propagation to main logger
+    if propagate:
+        main_logger = get_main_logger()
+        # Only set up propagation if this is not the main logger itself
+        if logger.name != main_logger.name:
+            logger.propagate = True
+            # Ensure the logger hierarchy is properly set up
+            if not logger.parent or logger.parent.name != main_logger.name:
+                logger.parent = main_logger
     else:
         logger.propagate = False
 
     return logger
+
+
+class TurnLogger:
+    def __init__(self, csv_file_path):
+        import os
+
+        print(f"csv_file_path: {os.path.abspath(csv_file_path)}")
+        self.csv_file_path = csv_file_path
+        self.current_row = {}
+        self.fieldnames = set()
+        self._ensure_csv_exists()
+
+    def _ensure_csv_exists(self):
+        if not os.path.exists(self.csv_file_path):
+            with open(self.csv_file_path, "w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=["created_date"])
+                writer.writeheader()
+
+    def new_turn(self):
+        """
+        Start a new turn by saving the current turn (if any) and initializing a new one.
+        """
+        if self.current_row:
+            self.save_turn()
+        self.current_row = {
+            "created_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+    def log(self, key, value):
+        """
+        Log a key-value pair. If the key already exists, append the new value with a line break.
+
+        Args:
+            key: The key to log
+            value: The value to log
+        """
+        if key in self.current_row:
+            self.current_row[key] = f"{self.current_row[key]}\n{value}"
+        else:
+            self.current_row[key] = value
+            if key not in self.fieldnames:
+                self.fieldnames.add(key)
+                self._update_csv_header()
+
+    def _update_csv_header(self):
+        # First read all existing rows
+        existing_rows = []
+        with open(self.csv_file_path, "r", newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            existing_fieldnames = reader.fieldnames or []
+            existing_rows = list(reader)  # Read all rows into memory
+
+        # Then write back with updated header
+        new_fieldnames = list(existing_fieldnames) + [
+            f for f in self.fieldnames if f not in existing_fieldnames
+        ]
+        with open(self.csv_file_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=new_fieldnames)
+            writer.writeheader()
+            for row in existing_rows:
+                writer.writerow(row)
+
+    def save_turn(self):
+        with open(self.csv_file_path, "a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(
+                csvfile, fieldnames=["created_date"] + list(self.fieldnames)
+            )
+            writer.writerow(self.current_row)
 
 
 # Example usage:
@@ -146,3 +223,16 @@ if __name__ == "__main__":
     logger.debug("This is a debug message")
     logger.warning("This is a warning message")
     logger.error("This is an error message")
+
+    turn_logger = TurnLogger("turn_log.csv")
+    turn_logger.new_turn()
+    turn_logger.log("key1", "value1")
+    turn_logger.log("key2", "value2")
+    turn_logger.new_turn()
+    turn_logger.log("key1", "value3")
+    turn_logger.log("key3", "value4")
+    turn_logger.new_turn()
+    turn_logger.log("new_key1", "value5")
+    turn_logger.log("new_key2", "value6")
+    turn_logger.log("new_key3", "value8")
+    turn_logger.new_turn()  # Final save

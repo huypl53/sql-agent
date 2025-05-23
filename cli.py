@@ -1,25 +1,24 @@
 import click
 import json
-from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
-from langchain_core.messages.utils import count_tokens_approximately
-from langchain_core.messages import trim_messages
 from langgraph.checkpoint.memory import MemorySaver
 from shared.logger import get_main_logger
 
+logger = get_main_logger(__name__, log_file="./logs/cli.log")
+
 from shared.db import get_db
-from sql_qa.llm.generation import LLMGeneration
 from sql_qa.llm.strategy import StategyFactory
 from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
 from sql_qa.prompt.constant import PromptConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import ApiAdapter
-from sql_qa.config import get_app_config
-
+from sql_qa.config import get_app_config, turn_logger
 from sql_qa.schema.store import Schema, SchemaStore
 
-logger = get_main_logger(__name__, log_file="./logs/cli.log")
-
 app_config = get_app_config()
+
+logger.info(
+    "--------------------------------Starting CLI--------------------------------"
+)
 logger.info(json.dumps(app_config.model_dump(), indent=4, ensure_ascii=False))
 
 
@@ -42,9 +41,9 @@ def cli():
     # logger.info(f"Tools: {tools}")
     chat_config = {"configurable": {"thread_id": "1", "user_id": "1"}}
 
-    checkpointer = MemorySaver()
+    # checkpointer = MemorySaver()
     schema_linking_adapter = ApiAdapter(
-        model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        model=app_config.schema_linking.model,
         tools=tools,
         prompt=PromptConstant.system.format(
             dialect=app_config.database.dialect.upper()
@@ -54,7 +53,7 @@ def cli():
     )
 
     response_enhancement_adapter = ApiAdapter(
-        model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        model=app_config.result_enhancement.model,
         tools=tools,
         prompt=PromptConstant.system.format(
             dialect=app_config.database.dialect.upper()
@@ -72,8 +71,11 @@ def cli():
         "exit",
         "quit",
         "q",
+        turn_logger.new_turn(),
     ]:
         logger.info(f"User question: {user_question}")
+
+        turn_logger.log("user_question", user_question)
         linking_response = schema_linking_adapter.invoke(
             {
                 "messages": [
@@ -103,10 +105,27 @@ def cli():
         ]
         table_names = structured_linking_response.tables
         logger.info(f"Table names: {table_names}")
-
-        filtered_schema_tables = schema_store.search_tables(table_names, mode="same")
+        turn_logger.log(
+            "linking_structured_result",
+            structured_linking_response.model_dump_json(indent=4),
+        )
+        filtered_schema_tables = schema_store.search_tables(
+            table_names, mode="same", include_foreign_keys=True
+        )
         logger.info(
             f"filtered_schema_tables: {[t.name for s in filtered_schema_tables.values() for t in s.tables if s]}"
+        )
+        turn_logger.log(
+            "filtered_schema_tables",
+            json.dumps(
+                [
+                    t.name
+                    for s in filtered_schema_tables.values()
+                    for t in s.tables
+                    if s
+                ],
+                indent=4,
+            ),
         )
 
         # success, final_sql = sql_generator.invoke(user_question, filtered_schema_tables)
@@ -127,25 +146,32 @@ def cli():
         try:
             sql_result = db.run(final_sql)
             logger.info(f"SQL result: {sql_result}")
+            turn_logger.log("sql_result", sql_result)
         except Exception as e:
             logger.error(f"SQL execution failed: {e}")
             print("SQL execution failed")
             continue
 
+        response_enhancement_prompt = PromptConstant.response_enhancement.format(
+            question=user_question,
+            sql_query=final_sql,
+            result=sql_result,
+        )
+        turn_logger.log("response_enhancement_prompt", response_enhancement_prompt)
         response_enhancement_response = response_enhancement_adapter.invoke(
             {
                 "messages": [
                     {
-                        "role": Role.ASSISTANT,
-                        "content": PromptConstant.response_enhancement.format(
-                            question=user_question,
-                            sql_query=final_sql,
-                            result=sql_result,
-                        ),
+                        "role": Role.USER,
+                        "content": response_enhancement_prompt,
                     }
                 ]
             },
             config=chat_config,
+        )
+        turn_logger.log(
+            "response_enhancement_response",
+            f" {response_enhancement_response['structured_response'] if response_enhancement_response else 'None'}",
         )
         if not response_enhancement_response:
             logger.error(f"Response enhancement response is None")
@@ -156,6 +182,10 @@ def cli():
             f"Response enhancement result: {response_enhancement_result.content}"
         )
         print(f"Bot: f{response_enhancement_result.content}")
+        turn_logger.log(
+            "response_enhancement_result", response_enhancement_result.content
+        )
+        turn_logger.new_turn()
 
 
 def extract_table_name_list(text):

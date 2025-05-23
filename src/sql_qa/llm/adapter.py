@@ -20,7 +20,7 @@ from sql_qa.llm.util import on_llm_retry_fail
 
 from shared.logger import get_logger
 
-logger = get_logger(__name__, log_file=f"./logs/{__name__}.log")
+logger = get_logger(__name__)
 
 API_MODELS = ["gemini", "openai", "anthropic", "mistral"]
 
