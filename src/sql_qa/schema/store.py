@@ -68,12 +68,18 @@ class SchemaStore(BaseModel):
             for table in schema.tables:
                 for query in queries:
                     if mode == "same":
+                        if query.lower() == table.name.lower().rsplit(".", 1)[-1]:
+                            matching_tables[schema_name].add(table.name)
+                    elif (
+                        mode == "connected"
+                        or mode == "exact"
+                        and query.lower() in table.name.lower()
+                    ):
                         matching_tables[schema_name].add(table.name)
+                    else:
                         continue
-                    if query.lower() in table.name.lower():
-                        matching_tables[schema_name].add(table.name)
 
-        if mode == "exact":
+        if mode == "exact" or mode == "same":
             return self._create_filtered_schemas(matching_tables, include_foreign_keys)
 
         # For connected mode, find all related tables
@@ -89,9 +95,9 @@ class SchemaStore(BaseModel):
             for fk in schema.foreign_keys:
                 # Parse foreign key string (assuming format: "table1.column1 -> table2.column2")
                 try:
-                    source, target = fk.split(" -> ")
-                    source_table = source.split(".")[0]
-                    target_table = target.split(".")[0]
+                    source, target = fk.split("=")
+                    source_table = source.split(".")[0].strip()
+                    target_table = target.split(".")[0].strip()
 
                     # If either table is in matching_tables, add both to connected_tables
                     if (
@@ -126,14 +132,19 @@ class SchemaStore(BaseModel):
                 ],
             )
 
+            print(
+                f"filtered_schema: {[table.name for table in filtered_schema.tables]}"
+            )
+
             # Handle foreign keys
             if include_foreign_keys and schema.foreign_keys:
                 filtered_fks = []
+                # print(f"schema.foreign_keys: {schema.foreign_keys}")
                 for fk in schema.foreign_keys:
                     try:
-                        source, target = fk.split(" -> ")
-                        source_table = source.split(".")[0]
-                        target_table = target.split(".")[0]
+                        source, target = fk.split("=")
+                        source_table = source.split(".")[0].strip()
+                        target_table = target.split(".")[0].strip()
 
                         # Only include foreign keys between selected tables
                         if (
@@ -160,10 +171,41 @@ if __name__ == "__main__":
     store = SchemaStore()
     store.add_schema(schema)
 
+    print("\n=== Same Match Mode ===")
+    exact_result = store.search_tables(
+        queries=[
+            "sale_invoice",
+            "branch",
+            "sale_invoice_detail",
+            "item",
+            "batch_info",
+            "store",
+        ],  # Chinook database tables
+        mode="same",
+        include_foreign_keys=True,
+    )
+
+    print("\nSame match results:")
+    for schema_name, filtered_schema in exact_result.items():
+        print(f"\nSchema: {schema_name}")
+        print("Tables found:")
+        for table in filtered_schema.tables:
+            print(f"- {table.name}")
+        if filtered_schema.foreign_keys:
+            print("\nForeign keys between selected tables:")
+            for fk in filtered_schema.foreign_keys:
+                print(f"- {fk}")
     # Example 1: Exact match mode
     print("\n=== Exact Match Mode ===")
     exact_result = store.search_tables(
-        queries=["Customer", "Invoice"],  # Chinook database tables
+        queries=[
+            "sale_invoice",
+            "branch",
+            "sale_invoice_detail",
+            "item",
+            "batch_info",
+            "store",
+        ],  # Chinook database tables
         mode="exact",
         include_foreign_keys=True,
     )
@@ -182,7 +224,14 @@ if __name__ == "__main__":
     # Example 2: Connected mode
     print("\n=== Connected Mode ===")
     connected_result = store.search_tables(
-        queries=["Customer"],  # Start with Customer table
+        queries=[
+            "sale_invoice",
+            "branch",
+            "sale_invoice_detail",
+            "item",
+            "batch_info",
+            "store",
+        ],  # Start with Customer table
         mode="connected",
         include_foreign_keys=True,
     )
@@ -197,13 +246,3 @@ if __name__ == "__main__":
             print("\nForeign keys between all related tables:")
             for fk in filtered_schema.foreign_keys:
                 print(f"- {fk}")
-
-    # Print comparison
-    print("\n=== Comparison ===")
-    print(
-        "Exact mode tables:", [t.name for s in exact_result.values() for t in s.tables]
-    )
-    print(
-        "Connected mode tables:",
-        [t.name for s in connected_result.values() for t in s.tables],
-    )
