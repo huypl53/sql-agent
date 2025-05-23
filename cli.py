@@ -58,7 +58,7 @@ def cli():
         prompt=PromptConstant.system.format(
             dialect=app_config.database.dialect.upper()
         ),
-        response_format=SqlResponseEnhancementResponse,
+        # response_format=SqlResponseEnhancementResponse,
         # checkpointer=checkpointer,
     )
 
@@ -171,7 +171,7 @@ def cli():
         )
         turn_logger.log(
             "response_enhancement_response",
-            f" {response_enhancement_response['structured_response'] if response_enhancement_response else 'None'}",
+            f" {response_enhancement_response['messages'][-1].content if response_enhancement_response else 'None'}",
         )
         if not response_enhancement_response:
             logger.error(f"Response enhancement response is None")

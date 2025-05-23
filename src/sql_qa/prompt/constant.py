@@ -7,23 +7,24 @@ app_config = get_app_config()
 class PromptConstant:
     _gen_prefix = """
     **CHÚ Ý**: 
-    - Phải tuân thủ đúng cú pháp của câu lệnh SQL và các quy tắc của {dialect}.
+    - Phải tuân thủ đúng cú pháp và các quy tắc của hệ quản trị cơ sở dữ liệu {dialect}.
     - Câu truy vấn SQL phải chứa thông tin có ý nghĩa và dễ hiểu cho người dùng.
     
     """.format(
         dialect=app_config.database.dialect.upper()
     )
-    _gen_suffix = """
+    _gen_suffix = f"""
     **Đầu vào**:
-    - Câu hỏi SQL: {question}
-    - Cấu trúc cơ sở dữ liệu: {schema}
-    - Bằng chứng: {evidence}
-    - Nhắc lại câu hỏi SQL: {question}
+    - Câu hỏi SQL: {{question}}
+    - Cấu trúc cơ sở dữ liệu: {{schema}}
+    - Bằng chứng: {{evidence}}
+    - Nhắc lại câu hỏi SQL: {{question}}
+    - Hệ quản trị cơ sở dữ liệu: {app_config.database.dialect.upper()}
 
     --- 
     
     **Đầu ra**:
-    - Câu lệnh SQL: 
+    - Câu lệnh {app_config.database.dialect.upper()}: 
     - Giải thích: 
     """
     system: PromptTemplate = PromptTemplate(
@@ -362,7 +363,7 @@ Bạn là chuyên gia SQL có nhiệm vụ kiểm tra tính hợp lệ của câ
 {{query}}
 ```
 
-**KIỂM TRA KỸ LƯỠNG câu truy vấn {{dialect}} ở trên để tìm các lỗi phổ biến, bao gồm**:
+**KIỂM TRA KỸ LƯỠNG câu truy vấn ở trên để tìm các lỗi phổ biến, bao gồm**:
 - Sử dụng NOT IN với các giá trị NULL
 - Sử dụng UNION khi nên dùng UNION ALL
 - Sử dụng BETWEEN cho các khoảng không bao gồm biên
@@ -371,6 +372,7 @@ Bạn là chuyên gia SQL có nhiệm vụ kiểm tra tính hợp lệ của câ
 - Sử dụng đúng số lượng tham số cho các hàm
 - Ép kiểu sang đúng kiểu dữ liệu
 - Sử dụng đúng cột cho các phép nối
+- Cú pháp có đúng hệ quản trị cơ sở dữ liệu: {app_config.database.dialect.upper()}
 
 Nếu có bất kỳ lỗi nào trong số các lỗi trên, trả về `false`. Nếu không có lỗi nào, chỉ cần trả về `true`.
         """,
