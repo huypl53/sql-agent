@@ -1,0 +1,173 @@
+from typing import Optional
+from shared.db import get_db
+from shared.logger import get_main_logger
+from sql_qa.llm.strategy import StategyFactory
+from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
+from sql_qa.prompt.constant import PromptConstant
+from sql_qa.prompt.template import Role
+from sql_qa.llm.adapter import ApiAdapter
+from sql_qa.schema.store import Schema, SchemaStore
+from sql_qa.config import Settings, get_app_config, turn_logger
+import json
+
+logger = get_main_logger(__name__)
+
+
+class Runner:
+    def __init__(self, app_config: Settings, chat_config: dict = {}):
+        self.app_config = app_config
+
+        self.db = get_db()
+        # llm = init_chat_model(app_config.llm.model, model_provider=app_config.llm.provider)
+        # toolkit = SQLDatabaseToolkit(db=db, llm=llm)
+
+        # tools = toolkit.get_tools()[:1]  # query tool only
+        tools = []
+        # logger.info(f"Tools: {tools}")
+        self.chat_config = chat_config
+
+        # checkpointer = MemorySaver()
+        self.schema_linking_adapter = ApiAdapter(
+            model=self.app_config.schema_linking.model,
+            tools=tools,
+            prompt=PromptConstant.system.format(
+                dialect=self.app_config.database.dialect.upper()
+            ),
+            response_format=SqlLinkingTablesResponse,
+            # checkpointer=checkpointer,
+        )
+
+        self.response_enhancement_adapter = ApiAdapter(
+            model=self.app_config.result_enhancement.model,
+            tools=tools,
+            prompt=PromptConstant.system.format(
+                dialect=self.app_config.database.dialect.upper()
+            ),
+            # response_format=SqlResponseEnhancementResponse,
+            # checkpointer=checkpointer,
+        )
+
+        # sql_generator = LLMGeneration(chat_config)
+        schema = Schema.load(self.app_config.schema_path)
+        self.schema_store = SchemaStore()
+        self.schema_store.add_schema(schema)
+
+    def run(self, user_question: str) -> Optional[str]:
+
+        logger.info(f"User question: {user_question}")
+
+        turn_logger.log("user_question", user_question)
+        linking_response = self.schema_linking_adapter.invoke(
+            {
+                "messages": [
+                    {
+                        "role": Role.USER,
+                        "content": PromptConstant.table_linking.format(
+                            question=user_question,
+                            schema=list(self.schema_store.schemas.values())[
+                                0
+                            ].model_dump(mode="json"),
+                        ),
+                    }
+                ]
+            },
+            config=self.chat_config,
+        )
+        if not linking_response:
+            logger.error(f"Linking response is None")
+            return None
+        linking_result = linking_response["messages"][-1]
+        logger.info(f"Linking result: {linking_result.content}")
+        logger.info(
+            f"Linking structured result: {linking_response['structured_response']}"
+        )
+        structured_linking_response: SqlLinkingTablesResponse = linking_response[
+            "structured_response"
+        ]
+        table_names = structured_linking_response.tables
+        logger.info(f"Table names: {table_names}")
+        turn_logger.log(
+            "linking_structured_result",
+            structured_linking_response.model_dump_json(indent=4),
+        )
+        if not any(structured_linking_response.tables):
+            logger.error(f"No tables found")
+            return linking_result.content
+        filtered_schema_tables = self.schema_store.search_tables(
+            table_names, mode="same", include_foreign_keys=True
+        )
+        logger.info(
+            f"filtered_schema_tables: {[t.name for s in filtered_schema_tables.values() for t in s.tables if s]}"
+        )
+        turn_logger.log(
+            "filtered_schema_tables",
+            json.dumps(
+                [
+                    t.name
+                    for s in filtered_schema_tables.values()
+                    for t in s.tables
+                    if s
+                ],
+                indent=4,
+            ),
+        )
+
+        # success, final_sql = sql_generator.invoke(user_question, filtered_schema_tables)
+        strategy = StategyFactory(return_all=False)
+        strategy_results = strategy.generate(user_question, filtered_schema_tables)
+
+        if not any(strategy_results):
+            logger.error(f"SQL generation failed")
+            print("SQL generation failed")
+            return None
+        success, final_sql = strategy_results[0]
+
+        if not success:
+            logger.error(f"SQL generation failed")
+            print("SQL generation failed")
+            return None
+
+        try:
+            sql_result = self.db.run(final_sql)
+            logger.info(f"SQL result: {sql_result}")
+            turn_logger.log("sql_result", sql_result)
+        except Exception as e:
+            logger.error(f"SQL execution failed: {e}")
+            print("SQL execution failed")
+            return None
+
+        response_enhancement_prompt = PromptConstant.response_enhancement.format(
+            question=user_question,
+            sql_query=final_sql,
+            result=sql_result,
+        )
+        turn_logger.log("response_enhancement_prompt", response_enhancement_prompt)
+        response_enhancement_response = self.response_enhancement_adapter.invoke(
+            {
+                "messages": [
+                    {
+                        "role": Role.USER,
+                        "content": response_enhancement_prompt,
+                    }
+                ]
+            },
+            config=self.chat_config,
+        )
+        turn_logger.log(
+            "response_enhancement_response",
+            f" {response_enhancement_response['messages'][-1].content if response_enhancement_response else 'None'}",
+        )
+        if not response_enhancement_response:
+            logger.error(f"Response enhancement response is None")
+            print("Response enhancement response is None")
+            return None
+        response_enhancement_result = response_enhancement_response["messages"][-1]
+        logger.info(
+            f"Response enhancement result: {response_enhancement_result.content}"
+        )
+        print(f"Bot: f{response_enhancement_result.content}")
+        turn_logger.log(
+            "response_enhancement_result", response_enhancement_result.content
+        )
+        turn_logger.new_turn()
+        return response_enhancement_result.content
