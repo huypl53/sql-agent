@@ -1,5 +1,7 @@
 import click
 import json
+import pandas as pd
+from tqdm import tqdm
 
 # from langgraph.checkpoint.memory import MemorySaver
 from sql_qa.config import get_app_config, turn_logger
@@ -7,7 +9,7 @@ from shared.logger import get_main_logger, with_a_turn_logger
 
 logger = get_main_logger(__name__, log_file="./logs/cli.log")
 
-from sql_qa.runner import Runner
+from sql_qa.runner import Runner, RunnerResult
 
 app_config = get_app_config()
 
@@ -36,19 +38,64 @@ def cli():
 
 
 @with_a_turn_logger(turn_logger)
-def run_turn(runner: Runner, user_question: str):
+def run_turn(runner: Runner, user_question: str) -> RunnerResult:
     response = runner.run(user_question)
-    if response:
-        print(f"Bot: {response}")
+    if response.is_success:
+        print(f"Bot: {response.final_result}")
     else:
-        print("Failed to generate a response. Please try again.")
+        print(
+            f"Failed to generate a response. Please try again. Error: {response.error}"
+        )
+    return response
 
 
 @app.command()
-@click.option("--file", type=click.File("r"), help="File path to the benchmark data")
+@click.option("--file", type=click.File("r", encoding="utf-8"), required=True)
 def benchmark(file):
+    # Read CSV file with header
+    df = pd.read_csv(file, encoding="utf-8")
+    total_questions = len(df)
+    logger.info(f"Starting benchmark with {total_questions} questions")
 
-    pass
+    # Initialize the runner
+    runner = Runner(app_config)
+
+    # Create output file with initial data
+    output_file = file.name.replace(".csv", "_results.csv")
+    df["generated_sql_query"] = None
+    df["generated_query_result"] = None
+    df["generated_sql_error"] = None
+    df["generated_raw_result"] = None
+    df.to_csv(output_file, index=False, encoding="utf-8")
+
+    # Process each question and save results immediately
+    pbar = tqdm(
+        total=total_questions,
+        position=0,
+        leave=True,
+        desc="Processing questions",
+        unit="q",
+    )
+
+    for idx, question in enumerate(df["question"]):
+        try:
+            response = run_turn(runner, question)
+            # Update dataframe in memory
+            df.at[idx, "generated_sql_query"] = response.sql_query
+            df.at[idx, "generated_query_result"] = response.final_result
+            df.at[idx, "generated_sql_error"] = response.error
+            df.at[idx, "generated_raw_result"] = response.raw_result
+        except Exception as e:
+            logger.error(f"Error processing question {idx + 1}: {str(e)}")
+            df.at[idx, "generated_sql_error"] = str(e)
+        finally:
+            # Save after each question
+            df.to_csv(output_file, index=False, encoding="utf-8")
+            pbar.update(1)
+            pbar.set_description(f"Processed {pbar.n}/{total_questions} questions")
+
+    pbar.close()
+    logger.info(f"Results saved to {output_file}")
 
 
 def extract_table_name_list(text):

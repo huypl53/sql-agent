@@ -156,7 +156,7 @@ Bạn là chuyên gia SQL có nhiệm vụ tạo câu truy vấn SQL dựa trên
         role=Role.USER,
     )
 
-    dat_cot_genration = PromptTemplate(
+    dac_cot_genration = PromptTemplate(
         template=f"""
 {_gen_prefix}
 Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu lệnh SQL. Mục tiêu của bạn là tạo ra câu lệnh SQL chính xác, tối ưu, và đặc biệt là *cung cấp kết quả dễ hiểu, có ý nghĩa cho người dùng cuối*.

@@ -23,6 +23,14 @@ candidate_generations:
     query_fixer_kwargs:
       model: "google_genai:gemini-2.0-flash"
   -
+    prompt_type: "dac_cot_genration"
+    query_validation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    generation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    query_fixer_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+  -
     prompt_type: "query_plan_generation"
     query_validation_kwargs:
       model: "google_genai:gemini-2.0-flash"
