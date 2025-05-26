@@ -132,6 +132,21 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 
 # UI version
 uv run streamlit run ./src/sql_qa/ui.py
+
+# Benchmark 
+uv run ./cli.py benchmark --file data/GSV/generated-data/gen_success_data.csv
+
+# Evaluation
+# For separate files
+python -m src.sql_qa.metrics.evaluation evaluate-files \
+    --predicted-file predicted_queries.sql \
+    --ground-truth-file ground_truth_queries.sql \
+    --output-file results.json
+
+# For CSV file
+python -m src.sql_qa.metrics.evaluation evaluate-csv \
+    --input-file benchmark_results.csv \
+    --output-file results.json
 ```
 
 Options:
