@@ -4,6 +4,10 @@ from sql_qa.config import get_app_config
 app_config = get_app_config()
 
 
+class CommonConstant:
+    empty_return_value = "Không có kết quả trả về"
+
+
 class PromptConstant:
     _gen_prefix = """
     **CHÚ Ý**: 
@@ -401,6 +405,7 @@ Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn t�
    - Sử dụng ngôn ngữ dễ hiểu, phù hợp với người dùng.
    - Trình bày thông tin một cách có cấu trúc và logic.
 
+--- 
 **Câu hỏi của người dùng**: {question}
 
 **Câu lệnh SQL đã sử dụng**: 
@@ -408,7 +413,11 @@ Bạn nhận được **KẾT QUẢ GỐC** sau khi đã được truy vấn t�
 {sql_query}
 ```
 
-**Kết quả truy vấn SQL**: {result}
+**Kết quả truy vấn từ cơ sở dữ liệu**: 
+```text
+{result}
+```
+
         """,
         role=Role.USER,
     )
