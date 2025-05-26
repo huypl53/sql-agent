@@ -6,6 +6,10 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 import csv
 import os
+from functools import wraps
+from collections import OrderedDict
+import tempfile
+import shutil
 
 # Global main logger instance
 _main_logger = None
@@ -148,20 +152,45 @@ def get_logger(
 
 
 class TurnLogger:
+    delimiter = (
+        "\t"  # Using tab as delimiter which is less likely to appear in text content
+    )
+
     def __init__(self, csv_file_path):
         import os
+        from collections import OrderedDict
 
         print(f"csv_file_path: {os.path.abspath(csv_file_path)}")
         self.csv_file_path = csv_file_path
         self.current_row = {}
-        self.fieldnames = set()
+        self.fieldnames = OrderedDict()  # Use OrderedDict to preserve field order
         self._ensure_csv_exists()
 
     def _ensure_csv_exists(self):
-        if not os.path.exists(self.csv_file_path):
-            with open(self.csv_file_path, "w", newline="") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=["created_date"])
-                writer.writeheader()
+        try:
+            if not os.path.exists(self.csv_file_path):
+                with open(
+                    self.csv_file_path, "w", newline="", encoding="utf-8"
+                ) as csvfile:
+                    writer = csv.DictWriter(
+                        csvfile,
+                        fieldnames=["created_date"],
+                        delimiter=self.delimiter,
+                        quoting=csv.QUOTE_ALL,
+                    )
+                    writer.writeheader()
+            else:
+                # Read existing fieldnames to preserve order
+                with open(
+                    self.csv_file_path, "r", newline="", encoding="utf-8"
+                ) as csvfile:
+                    reader = csv.DictReader(
+                        csvfile, delimiter=self.delimiter, quoting=csv.QUOTE_ALL
+                    )
+                    if reader.fieldnames:
+                        self.fieldnames = OrderedDict.fromkeys(reader.fieldnames)
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize CSV file: {e}")
 
     def new_turn(self):
         """
@@ -181,38 +210,96 @@ class TurnLogger:
             key: The key to log
             value: The value to log
         """
-        if key in self.current_row:
-            self.current_row[key] = f"{self.current_row[key]}\n{value}"
-        else:
-            self.current_row[key] = value
-            if key not in self.fieldnames:
-                self.fieldnames.add(key)
-                self._update_csv_header()
+        try:
+            if key in self.current_row:
+                self.current_row[key] = f"{self.current_row[key]}\n{value}"
+            else:
+                self.current_row[key] = value
+                if key not in self.fieldnames:
+                    self.fieldnames[key] = None
+                    self._update_csv_header()
+        except Exception as e:
+            raise RuntimeError(f"Failed to log key-value pair: {e}")
 
     def _update_csv_header(self):
-        # First read all existing rows
-        existing_rows = []
-        with open(self.csv_file_path, "r", newline="", encoding="utf-8") as csvfile:
-            reader = csv.DictReader(csvfile)
-            existing_fieldnames = reader.fieldnames or []
-            existing_rows = list(reader)  # Read all rows into memory
+        try:
+            # Create a temporary file using tempfile module
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, newline="", encoding="utf-8"
+            ) as temp_file:
+                # Write to temporary file with new header
+                with open(
+                    self.csv_file_path, "r", newline="", encoding="utf-8"
+                ) as infile:
+                    reader = csv.DictReader(
+                        infile, delimiter=self.delimiter, quoting=csv.QUOTE_ALL
+                    )
+                    writer = csv.DictWriter(
+                        temp_file,
+                        fieldnames=list(self.fieldnames.keys()),
+                        delimiter=self.delimiter,
+                        quoting=csv.QUOTE_ALL,
+                    )
+                    writer.writeheader()
 
-        # Then write back with updated header
-        new_fieldnames = list(existing_fieldnames) + [
-            f for f in self.fieldnames if f not in existing_fieldnames
-        ]
-        with open(self.csv_file_path, "w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=new_fieldnames)
-            writer.writeheader()
-            for row in existing_rows:
-                writer.writerow(row)
+                    # Copy existing rows
+                    for row in reader:
+                        writer.writerow(row)
+
+                # Get the temporary file path
+                temp_path = temp_file.name
+
+            # Replace original file with temporary file
+            shutil.move(temp_path, self.csv_file_path)
+        except Exception as e:
+            # Clean up temporary file if it exists
+            if "temp_path" in locals() and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            raise RuntimeError(f"Failed to update CSV header: {e}")
 
     def save_turn(self):
-        with open(self.csv_file_path, "a", newline="", encoding="utf-8") as csvfile:
-            writer = csv.DictWriter(
-                csvfile, fieldnames=["created_date"] + list(self.fieldnames)
-            )
-            writer.writerow(self.current_row)
+        try:
+            with open(self.csv_file_path, "a", newline="", encoding="utf-8") as csvfile:
+                writer = csv.DictWriter(
+                    csvfile,
+                    fieldnames=list(self.fieldnames.keys()),
+                    delimiter=self.delimiter,
+                    quoting=csv.QUOTE_ALL,
+                )
+                writer.writerow(self.current_row)
+        except Exception as e:
+            raise RuntimeError(f"Failed to save turn: {e}")
+
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - ensures the current turn is saved"""
+        if self.current_row:
+            self.save_turn()
+
+
+def with_a_turn_logger(turn_logger: TurnLogger):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            turn_logger.new_turn()
+            try:
+                result = func(*args, **kwargs)
+                turn_logger.save_turn()
+                return result
+            except Exception as e:
+                turn_logger.log("error", f"Error: {e}")
+                turn_logger.save_turn()
+                raise e
+
+        return wrapper
+
+    return decorator
 
 
 # Example usage:

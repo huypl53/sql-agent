@@ -1,6 +1,6 @@
 from typing import Optional
 from shared.db import get_db
-from shared.logger import get_main_logger
+from shared.logger import get_main_logger, with_a_turn_logger
 from sql_qa.llm.strategy import StategyFactory
 from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
 from sql_qa.prompt.constant import PromptConstant
@@ -53,7 +53,6 @@ class Runner:
         self.schema_store.add_schema(schema)
 
     def run(self, user_question: str) -> Optional[str]:
-
         logger.info(f"User question: {user_question}")
 
         turn_logger.log("user_question", user_question)
@@ -133,7 +132,8 @@ class Runner:
             turn_logger.log("sql_result", sql_result)
         except Exception as e:
             logger.error(f"SQL execution failed: {e}")
-            print("SQL execution failed")
+            turn_logger.log("error", f"SQL execution failed: {e}")
+            # print("SQL execution failed")
             return None
 
         response_enhancement_prompt = PromptConstant.response_enhancement.format(
@@ -169,5 +169,4 @@ class Runner:
         turn_logger.log(
             "response_enhancement_result", response_enhancement_result.content
         )
-        turn_logger.new_turn()
         return response_enhancement_result.content

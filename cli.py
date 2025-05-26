@@ -1,11 +1,12 @@
 import click
 import json
-from langgraph.checkpoint.memory import MemorySaver
-from shared.logger import get_main_logger
+
+# from langgraph.checkpoint.memory import MemorySaver
+from sql_qa.config import get_app_config, turn_logger
+from shared.logger import get_main_logger, with_a_turn_logger
 
 logger = get_main_logger(__name__, log_file="./logs/cli.log")
 
-from sql_qa.config import get_app_config, turn_logger
 from sql_qa.runner import Runner
 
 app_config = get_app_config()
@@ -31,11 +32,23 @@ def cli():
         "quit",
         "q",
     ]:
-        response = runner.run(user_question)
-        if response:
-            print(f"Bot: {response}")
-        else:
-            print("Failed to generate a response. Please try again.")
+        run_turn(runner, user_question)
+
+
+@with_a_turn_logger(turn_logger)
+def run_turn(runner: Runner, user_question: str):
+    response = runner.run(user_question)
+    if response:
+        print(f"Bot: {response}")
+    else:
+        print("Failed to generate a response. Please try again.")
+
+
+@app.command()
+@click.option("--file", type=click.File("r"), help="File path to the benchmark data")
+def benchmark(file):
+
+    pass
 
 
 def extract_table_name_list(text):
