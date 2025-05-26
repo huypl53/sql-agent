@@ -91,7 +91,7 @@ class Runner:
         )
         if not any(structured_linking_response.tables):
             logger.error(f"No tables found")
-            return linking_result.content
+            return None
         filtered_schema_tables = self.schema_store.search_tables(
             table_names, mode="same", include_foreign_keys=True
         )
@@ -119,15 +119,15 @@ class Runner:
             logger.error(f"SQL generation failed")
             print("SQL generation failed")
             return None
-        success, final_sql = strategy_results[0]
+        final_result = strategy_results[0]
 
-        if not success:
+        if not final_result.is_correct:
             logger.error(f"SQL generation failed")
             print("SQL generation failed")
             return None
 
         try:
-            sql_result = self.db.run(final_sql)
+            sql_result = self.db.run(final_result.sql)
             logger.info(f"SQL result: {sql_result}")
             turn_logger.log("sql_result", sql_result)
         except Exception as e:
@@ -138,7 +138,7 @@ class Runner:
 
         response_enhancement_prompt = PromptConstant.response_enhancement.format(
             question=user_question,
-            sql_query=final_sql,
+            sql_query=final_result.sql,
             result=sql_result,
         )
         turn_logger.log("response_enhancement_prompt", response_enhancement_prompt)

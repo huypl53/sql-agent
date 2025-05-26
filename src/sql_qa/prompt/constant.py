@@ -143,12 +143,12 @@ Bạn là chuyên gia SQL có nhiệm vụ tạo câu truy vấn SQL dựa trên
 
 **Định dạng đầu ra**:  Trình bày câu truy vấn đã sửa của bạn dưới dạng một dòng mã SQL duy nhất, sau phần Kết quả cuối cùng. Đảm bảo không có ngắt dòng trong câu truy vấn.  
 
-Dưới đây là một số ví dụ: {{examples}} 
 
 ---
 
 {_gen_suffix}
         """,
+        # Dưới đây là một số ví dụ: {{examples}}
         role=Role.USER,
     )
 
@@ -170,7 +170,6 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 **Cấu trúc cơ sở dữ liệu:** {{schema}}
 **Bằng chứng (Các bản ghi mẫu và mô tả cột):** {{evidence}}
 **Câu hỏi SQL:** {{question}}
-**Gợi ý (nếu có):** {{hint}}
 
 ---
 
@@ -228,6 +227,7 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 ---
 {_gen_suffix}
 """,
+        # **Gợi ý (nếu có):** {{hint}}
         role=Role.USER,
     )
 
@@ -252,7 +252,6 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 **Bằng chứng (Các bản ghi mẫu và mô tả cột):** {{evidence}}
 
 **Câu hỏi SQL:** {{question}}
-**Gợi ý (nếu có):** {{hint}}
 
 ---
 
@@ -301,6 +300,7 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 ---
 {_gen_suffix}
 """,
+        # **Gợi ý (nếu có):** {{hint}}
         role=Role.USER,
     )
 

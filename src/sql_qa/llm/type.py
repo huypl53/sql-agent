@@ -6,6 +6,12 @@ class LlmResponse(BaseModel):
     pass
 
 
+class GenerationResult(BaseModel):
+    sql: Optional[str]
+    execution_result: Optional[str]
+    is_correct: bool
+
+
 class SqlLinkingResponse(LlmResponse):
     result: str
 
