@@ -144,9 +144,7 @@ python -m src.sql_qa.metrics.evaluation evaluate-files \
     --output-file results.json
 
 # For CSV file
-python -m src.sql_qa.metrics.evaluation evaluate-csv \
-    --input-file benchmark_results.csv \
-    --output-file results.json
+python -m src.sql_qa.metrics.evaluation evaluate-csv --input-file benchmark_results.csv --output-file results.json
 ```
 
 Options:
