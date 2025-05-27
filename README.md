@@ -24,6 +24,7 @@ SQL-QA
 - Comprehensive logging of all interactions
 - Support for various SQL databases (MySQL, SQLite)
 - Verbose mode for debugging and understanding agent reasoning
+- SQL pair filtering and evaluation tools
 
 ```mermaid
 
@@ -144,12 +145,23 @@ python -m src.sql_qa.metrics.evaluation evaluate-files \
     --output-file results.json
 
 # For CSV file
-python -m src.sql_qa.metrics.evaluation evaluate-csv --input-file benchmark_results.csv --output-file results.json
+python -m src.sql_qa.metrics.evaluation evaluate-csv \
+    --input-file benchmark_results.csv \
+    --output-file results.json
+
+# Filter SQL pairs
+python -m src.sql_qa.metrics.filter filter-csv \
+    --input-file input.csv \
+    --output-file filtered.csv \
+    --skipped-file skipped.csv \
+    --max-result-length 1000
 ```
 
 Options:
 
 - `--verbose`: Enable verbose mode to see agent thoughts (default: True)
+- `--max-result-length`: Maximum length of result strings before skipping (default: 1000)
+- `--skipped-file`: Path to save skipped queries (default: skipped_queries.csv)
 
 ## License
 
