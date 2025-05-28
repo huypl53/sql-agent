@@ -3,7 +3,7 @@ from shared.db import get_db
 from shared.logger import get_main_logger, with_a_turn_logger
 from sql_qa.llm.strategy import StategyFactory
 from sql_qa.llm.type import SqlLinkingTablesResponse, SqlResponseEnhancementResponse
-from sql_qa.prompt.constant import CommonConstant, PromptConstant
+from sql_qa.prompt.constant import CommonConstant, Text2SqlConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import ApiAdapter
 from sql_qa.schema.store import Schema, SchemaStore
@@ -39,7 +39,7 @@ class Runner:
         self.schema_linking_adapter = ApiAdapter(
             model=self.app_config.schema_linking.model,
             tools=tools,
-            prompt=PromptConstant.system.format(
+            prompt=Text2SqlConstant.system.format(
                 dialect=self.app_config.database.dialect.upper()
             ),
             response_format=SqlLinkingTablesResponse,
@@ -49,7 +49,7 @@ class Runner:
         self.response_enhancement_adapter = ApiAdapter(
             model=self.app_config.result_enhancement.model,
             tools=tools,
-            prompt=PromptConstant.system.format(
+            prompt=Text2SqlConstant.system.format(
                 dialect=self.app_config.database.dialect.upper()
             ),
             # response_format=SqlResponseEnhancementResponse,
@@ -70,7 +70,7 @@ class Runner:
                 "messages": [
                     {
                         "role": Role.USER,
-                        "content": PromptConstant.table_linking.format(
+                        "content": Text2SqlConstant.table_linking.format(
                             question=user_question,
                             schema=list(self.schema_store.schemas.values())[
                                 0
@@ -145,7 +145,7 @@ class Runner:
             # print("SQL execution failed")
             return RunnerResult(is_success=False, error="SQL execution failed")
 
-        response_enhancement_prompt = PromptConstant.response_enhancement.format(
+        response_enhancement_prompt = Text2SqlConstant.response_enhancement.format(
             question=user_question,
             sql_query=final_generation_result.sql,
             result=sql_result if sql_result else CommonConstant.empty_return_value,

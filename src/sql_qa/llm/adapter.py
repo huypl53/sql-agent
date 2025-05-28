@@ -1,5 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Type,
+    Union,
+    TypeVar,
+)
 
 from langchain_core.language_models import LanguageModelLike
 from langchain_core.runnables.base import RunnableLike
@@ -164,3 +174,17 @@ class HuggingFaceAdapter(BaseAdapter):
 
     def invoke(self, *args, **kwargs: Any) -> Any:
         return self.agent_executor.invoke(*args, **kwargs)
+
+
+T = TypeVar("T", bound=BaseAdapter)
+
+
+def get_adapter_class(
+    model: str, original: bool = False
+) -> Union[Type[T], Callable[..., Any]]:
+    if original:
+        return create_react_agent
+    elif [m for m in API_MODELS if m in model]:
+        return ApiAdapter
+    else:
+        return HuggingFaceAdapter

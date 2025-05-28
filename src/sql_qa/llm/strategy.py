@@ -4,9 +4,10 @@ from shared.logger import get_logger
 
 
 from sql_qa.config import get_app_config, turn_logger
-from sql_qa.llm.generation import LLMGeneration, get_adapter_class
+from sql_qa.llm.adapter import get_adapter_class
+from sql_qa.llm.generation import LLMGeneration
 from sql_qa.llm.type import GenerationResult, SQLGenerationResponse
-from sql_qa.prompt.constant import PromptConstant
+from sql_qa.prompt.constant import Text2SqlConstant
 from sql_qa.prompt.template import Role
 
 app_config = get_app_config()
@@ -24,7 +25,7 @@ class StategyFactory:
             get_adapter_class(merger_config.model)(
                 model=merger_config.model,
                 tools=[],
-                prompt=PromptConstant.system.format(
+                prompt=Text2SqlConstant.system.format(
                     dialect=app_config.database.dialect.upper()
                 ),
                 response_format=SQLGenerationResponse,
@@ -52,7 +53,7 @@ class StategyFactory:
             results = sorted(results, key=lambda x: x.is_correct, reverse=True)
             success_sqls = [r.sql for r in results if r.is_correct]
             if self.merger_adapter and success_sqls:
-                merger_prompt = PromptConstant.merger.format(
+                merger_prompt = Text2SqlConstant.merger.format(
                     candidates="\n".join(
                         [
                             f"Câu lệnh SQL {i+1}: " "```sql" f"{r}" "```"

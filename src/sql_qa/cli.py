@@ -55,8 +55,6 @@ logger = get_logger(
 )
 logger.info(f"Working directory: {os.getcwd()}")
 
-# Initialize LLM and agent
-logger.info(f"LLM: {config.llm.provider} ({config.llm.model_provider})")
 
 mdb = get_db()
 agent_executor, checkpointer = next(gen_agent_executor(mdb))
@@ -85,7 +83,7 @@ async def chat_completions(request: ChatCompletionRequest):
             stream_mode="values",
         ):
             final_response = step["messages"][-1]
-            logger.info(f"Bot: {final_response}")
+            # logger.info(f"Bot: {final_response}")
 
         # Log final response
         logger.info(f"Bot: {final_response}")

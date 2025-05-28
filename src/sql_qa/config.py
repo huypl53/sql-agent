@@ -74,8 +74,65 @@ class GenerationConfig(BaseSettings):
     query_fixer_kwargs: LlmConfig
 
 
+class MCPConfig(BaseSettings):
+    transport: Literal["sse", "streamable_http", "stdio"] = Field(
+        default="sse",
+    )
+    server_name: Literal["mcp-server-chart", "mcp-server-text2sql"] = Field(
+        default="mcp-server-chart",
+        description="Name of the MCP server",
+    )
+
+    # SSE or streamable_http
+    port: Optional[int] = Field(
+        default=None,
+        description="Port of the MCP server if mode is sse or stream",
+    )
+    url: Optional[str] = Field(
+        default=None,
+        description="URL of the MCP server if mode is sse or stream",
+    )
+
+    # stdio
+    command: Optional[str] = Field(
+        default=None,
+        description="Command to start the MCP server if mode is stdio",
+    )
+    args: Optional[List[str]] = Field(
+        default=None,
+        description="Arguments to start the MCP server if mode is stdio",
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        if self.transport == "sse":
+            return {
+                self.server_name: {
+                    "url": self.url,
+                    "transport": self.transport,
+                }
+            }
+        elif self.transport == "streamable_http":
+            return {
+                self.server_name: {
+                    "url": self.url,
+                    "transport": self.transport,
+                }
+            }
+        elif self.transport == "stdio":
+            return {
+                self.server_name: {
+                    "command": self.command,
+                    "args": self.args,
+                    "transport": self.transport,
+                }
+            }
+        else:
+            raise ValueError(f"Invalid transport: {self.transport}")
+
+
 class Settings(BaseSettings):
     model_config = ConfigDict(extra="allow")
+
     mode: Literal["dev", "prod", "benchmark"] = Field(
         default="dev",
         alias="MODE",
@@ -84,8 +141,8 @@ class Settings(BaseSettings):
     schema_path: str = Field(
         alias="SCHEMA_PATH",
     )
-    logging: _Logging = _Logging()
     database: _Database = _Database()
+    logging: _Logging = _Logging()
     llm: _LLM = _LLM()
     candidate_generations: List[GenerationConfig]
 
@@ -96,6 +153,14 @@ class Settings(BaseSettings):
         default="./logs/turn_log.csv",
         alias="TURN_LOG_FILE",
     )
+
+    # MCP setup
+    mcp_servers: List[MCPConfig] = Field(
+        default=[],
+        description="List of MCP servers",
+    )
+
+    orchestrator: LlmConfig = LlmConfig()
 
     @classmethod
     def settings_customise_sources(

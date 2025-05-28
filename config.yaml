@@ -47,3 +47,24 @@ result_enhancement:
 
 schema_linking:
   model: "google_genai:gemini-2.0-flash"
+  
+# MCP servers
+mcp_servers:
+  -
+    server_name: "mcp-server-chart"
+    url: "http://localhost:1122/sse"
+    transport: "sse"
+    # transport: "streamable_http"
+  # - 
+  #   server_name: "mcp-server-chart"
+  #   command: "mcp-server-chart"
+  #   args: ["--transport", "stdio"]
+  #   transport: "stdio"
+  -
+    server_name: "mcp-server-text2sql"
+    url: "http://127.0.0.1:8000/sse"
+    transport: "sse"
+    
+orchestrator:
+  model: "mistralai:mistral-small-latest"
+  # model: "google_genai:gemini-2.0-flash"

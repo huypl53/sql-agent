@@ -79,5 +79,6 @@ outputs/**
 data/
 
 Chinook.db
+.cursor
 
 *.json

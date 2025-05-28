@@ -73,6 +73,7 @@ sequenceDiagram
 ## Prerequisites
 
 - Python 3.10+
+- NPM
 
 ## Installation
 
@@ -108,6 +109,12 @@ uv sync
 curl -s https://raw.githubusercontent.com/lerocha/chinook-database/master/ChinookDatabase/DataSources/Chinook_Sqlite.sql | sqlite3 Chinook.db
 ```
 
+Start chart visulization server
+
+```bash
+npm install -g @antv/mcp-server-chart
+```
+
 ## Usage
 
 Run the application:
@@ -132,7 +139,22 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 }'
 
 # UI version
+## Start mpc-chart-server
+mcp-server-chart --transport sse --port 1122
+## Start MCP SQL server
+uv run text2sql.py mcp-server --transport sse
+
+## Start main app - ongoing
 uv run streamlit run ./src/sql_qa/ui.py
+
+## Start cli app
+uv run ./orchestrator.py
+
+```
+
+## Evaluation
+
+```bash
 
 # Benchmark 
 uv run ./cli.py benchmark --file data/GSV/generated-data/gen_success_data.csv
@@ -155,6 +177,7 @@ python -m src.sql_qa.metrics.filter filter-csv \
     --output-file filtered.csv \
     --skipped-file skipped.csv \
     --max-result-length 1000
+
 ```
 
 Options:

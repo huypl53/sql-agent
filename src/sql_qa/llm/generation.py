@@ -1,15 +1,15 @@
-from typing import Optional, Tuple, Type
+from typing import Optional, Tuple
 
 from shared.db import get_db
 from sql_qa.config import get_app_config
-from sql_qa.llm.adapter import API_MODELS, ApiAdapter, BaseAdapter, HuggingFaceAdapter
+from sql_qa.llm.adapter import get_adapter_class
 from sql_qa.llm.type import (
     GenerationResult,
     SQLGenerationResponse,
     SQLQueryFixerResponse,
     SQLQueryValidationResponse,
 )
-from sql_qa.prompt.constant import PromptConstant
+from sql_qa.prompt.constant import Text2SqlConstant
 
 from shared.logger import get_logger
 from sql_qa.config import turn_logger
@@ -19,13 +19,6 @@ from sql_qa.prompt.template import Role
 logger = get_logger(__name__)
 
 app_config = get_app_config()
-
-
-def get_adapter_class(model: str) -> Type[BaseAdapter]:
-    if [m for m in API_MODELS if m in model]:
-        return ApiAdapter
-    else:
-        return HuggingFaceAdapter
 
 
 class LLMGeneration:
@@ -49,7 +42,7 @@ class LLMGeneration:
         )(
             # model=f"{app_config.llm.provider}:{app_config.llm.model}",
             tools=self.tools,
-            prompt=PromptConstant.system.format(
+            prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
             response_format=SQLQueryValidationResponse,
@@ -61,7 +54,7 @@ class LLMGeneration:
         self.query_fixer_adapter = get_adapter_class(query_fixer_kwargs.get("model"))(
             # model=f"{app_config.llm.provider}:{app_config.llm.model}",
             tools=self.tools,
-            prompt=PromptConstant.system.format(
+            prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
             response_format=SQLQueryFixerResponse,
@@ -73,7 +66,7 @@ class LLMGeneration:
         self.generation_adapter = get_adapter_class(generation_kwargs.get("model"))(
             # model=f"{app_config.llm.provider}:{app_config.llm.model}",
             tools=self.tools,
-            prompt=PromptConstant.system.format(
+            prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
             response_format=SQLGenerationResponse,
@@ -107,7 +100,7 @@ class LLMGeneration:
                     f"Run iteration: {run_iter}; Evidence: {generation_evidence}; Response is correct: {sql_is_correct}"
                 )
                 run_iter += 1
-                prompt_template = getattr(PromptConstant, self.prompt_type)
+                prompt_template = getattr(Text2SqlConstant, self.prompt_type)
                 generation_prompt = prompt_template.format(
                     question=user_question,
                     evidence=generation_evidence,
@@ -154,7 +147,7 @@ class LLMGeneration:
 
                 # response_is_correct = True
                 # break
-                query_validation_prompt = PromptConstant.query_validation.format(
+                query_validation_prompt = Text2SqlConstant.query_validation.format(
                     question=user_question,
                     query=sql,
                     dialect=app_config.database.dialect.upper(),
@@ -232,7 +225,7 @@ class LLMGeneration:
                     final_sql
                 )
                 if not execution_result_is_correct:
-                    query_fixing_prompt = PromptConstant.query_fixing.format(
+                    query_fixing_prompt = Text2SqlConstant.query_fixing.format(
                         schema=schema,
                         question=user_question,
                         evidence=generation_evidence,
