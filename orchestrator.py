@@ -1,14 +1,15 @@
 import asyncio
+from langgraph.graph.graph import CompiledGraph
 from shared.logger import get_main_logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from colorama import Fore, Style
+from shared.tool import get_current_time
+from shared.tool import get_current_date
 from sql_qa.llm.adapter import get_adapter_class
 from sql_qa.prompt.constant import OrchestratorConstant
 from sql_qa.prompt.template import Role
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph_swarm import create_handoff_tool, create_swarm
-from datetime import datetime
-import pytz
 
 logger = get_main_logger(__name__, log_file=f"./logs/{__name__}.log")
 from sql_qa.config import get_app_config
@@ -20,37 +21,7 @@ mcp_servers_dict = {s.server_name: list(s.to_dict().values())[0] for s in mcp_se
 logger.info(f"MCP servers: {mcp_servers_dict}")
 
 
-def get_current_time() -> str:
-    """Get the current time in Vietnam timezone (Asia/Ho_Chi_Minh).
-
-    Returns:
-        str: Current time in format 'YYYY-MM-DD HH:MM:SS TZ'
-        Example: '2024-03-21 14:30:45 ICT'
-    """
-    # Get the current time in UTC
-    utc_now = datetime.now(pytz.UTC)
-    # Convert to local timezone (you can change this to any timezone)
-    local_tz = pytz.timezone("Asia/Ho_Chi_Minh")  # Default to Vietnam timezone
-    local_time = utc_now.astimezone(local_tz)
-    return local_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-
-
-def get_current_date() -> str:
-    """Get the current date in Vietnam timezone (Asia/Ho_Chi_Minh) with weekday.
-
-    Returns:
-        str: Current date in format 'YYYY-MM-DD (Weekday)'
-        Example: '2024-03-21 (Thursday)'
-    """
-    # Get the current date in UTC
-    utc_now = datetime.now(pytz.UTC)
-    # Convert to local timezone (you can change this to any timezone)
-    local_tz = pytz.timezone("Asia/Ho_Chi_Minh")  # Default to Vietnam timezone
-    local_time = utc_now.astimezone(local_tz)
-    return local_time.strftime("%Y-%m-%d (%A)")
-
-
-async def main_langchain():
+async def get_orchestrator_executor() -> CompiledGraph:
     client = MultiServerMCPClient(mcp_servers_dict)
 
     base_tools = [get_current_time, get_current_date]
@@ -86,7 +57,7 @@ async def main_langchain():
             *base_tools,
             create_handoff_tool(
                 agent_name="orchestrator",
-                description="Khi xong nhiệm vụ, chuyển giao cuộc hội thoại cho `orchestrator`",
+                description="Khi làm rõ câu hỏi xong, chuyển giao cuộc hội thoại cho `orchestrator`",
             ),
         ],
         checkpointer=checkpointer,
@@ -99,6 +70,11 @@ async def main_langchain():
         default_active_agent="orchestrator",
     )
     app = workflow.compile(checkpointer=checkpointer)
+    return app
+
+
+async def main_langchain():
+    agent_executor = await get_orchestrator_executor()
     config = {"configurable": {"thread_id": "1"}}
     while (user_message := input(Fore.GREEN + "User: " + Style.RESET_ALL)) not in [
         "exit",
@@ -106,7 +82,7 @@ async def main_langchain():
         "q",
     ]:
         logger.info(f"User: {user_message}")
-        response = await app.ainvoke(
+        response = await agent_executor.ainvoke(
             {
                 "messages": [
                     {
