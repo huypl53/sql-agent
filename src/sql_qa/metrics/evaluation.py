@@ -45,6 +45,7 @@ class DetailedResult(BaseModel):
     )
 
 
+
 class EvaluationResult(BaseModel):
     metrics: Dict[str, float] = Field(description="Dictionary of metric name to score")
     total_queries: int = Field(description="Total number of queries evaluated")
