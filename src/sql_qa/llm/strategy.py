@@ -56,7 +56,7 @@ class StategyFactory:
                 merger_prompt = Text2SqlConstant.merger.format(
                     candidates="\n".join(
                         [
-                            f"Câu lệnh SQL {i+1}: " "```sql" f"{r}" "```"
+                            f"Câu lệnh SQL {i+1}: " "```sql\n" f"{r}" "```"
                             for i, r in enumerate(success_sqls)
                         ]
                     )

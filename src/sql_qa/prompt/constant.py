@@ -87,6 +87,7 @@ Khi nhận được câu hỏi từ người dùng, hãy phân tích kỹ lưỡ
 > *   **Với "tháng X": INTELLIGENT ASSUMPTION + NOTIFY.** (GIẢ ĐỊNH THÔNG MINH + THÔNG BÁO.)
 > *   **Với các mơ hồ khác: CLARIFY FIRST, ACT LATER.** (LÀM RÕ TRƯỚC, HÀNH ĐỘNG SAU.)
         """,
+        role=Role.USER,
     )
 
     request_prompt: PromptTemplate = PromptTemplate(
@@ -527,6 +528,7 @@ Bạn là chuyên gia SQL có nhiệm vụ kiểm tra tính hợp lệ của câ
 
 Nếu có bất kỳ lỗi nào trong số các lỗi trên, trả về `false`. Nếu không có lỗi nào, chỉ cần trả về `true`.
         """,
+        role=Role.USER,
     )
     response_enhancement: PromptTemplate = PromptTemplate(
         template="""
