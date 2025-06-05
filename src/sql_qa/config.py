@@ -11,6 +11,7 @@ from pydantic import ConfigDict, Field
 import os
 from dotenv import load_dotenv
 from shared.logger import TurnLogger
+import pathlib
 
 load_dotenv(override=True)
 
@@ -183,7 +184,7 @@ class Settings(BaseSettings):
         return (
             init_settings,  # 1. Constructor arguments
             YamlConfigSettingsSource(
-                settings_cls, "config.yaml"
+                settings_cls, pathlib.Path(__file__).parent.parent.parent / "config.yaml"
             ),  # 2. Our custom YAML source
             dotenv_settings,  # 3. .env file
             env_settings,  # 4. Environment variables

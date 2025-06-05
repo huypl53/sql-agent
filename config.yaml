@@ -68,3 +68,9 @@ mcp_servers:
 orchestrator:
   # model: "mistralai:mistral-small-latest"
   model: "google_genai:gemini-2.0-flash"
+  
+
+vector_store:
+  collection_name: "gsv"
+  persistent_dir: "/mnt/Code/code/AI/agentic-AI/SQL-QA/data/vector/gsv"
+  embedding_model: "hiieu/halong_embedding"
