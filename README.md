@@ -121,17 +121,17 @@ Run the application:
 
 ```bash
 # API version
-uv run uvicorn src.sql_qa.cli:app --reload --port 8000
+uv run uvicorn src.sql_qa.cli:app --reload --port 8008
 
 # Then test
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:8008/v1/chat/completions \
 -H "Content-Type: application/json" \
 -d '{
   "model": "gpt-3.5-turbo",
   "messages": [
     {
       "role": "user",
-      "content": "có bao nhiêu khách hàng trong CSDL?"
+      "content": "cho tôi doanh số của từng cơ sở trong tháng 4 tính theo từng ngày"
     }
   ],
   "temperature": 0.7,

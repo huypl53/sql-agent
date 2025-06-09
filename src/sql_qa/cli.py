@@ -16,15 +16,6 @@ from shared.db import get_db
 # from sql_qa.config import DEFAULT_CONFIG
 from sql_qa.chat import gen_agent_executor
 from sql_qa.config import get_app_config
-from sql_qa.schema import (
-    AssistantMessage,
-    ChatCompletionRequest,
-    ChatCompletionResponse,
-    Choice,
-    CompletionTokenDetails,
-    TokenDetails,
-    Usage,
-)
 
 load_dotenv()
 
@@ -60,7 +51,7 @@ mdb = get_db()
 agent_executor, checkpointer = next(gen_agent_executor(mdb))
 
 
-@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
+@app.post("/v1/chat/completions", response_model=ChatCompletion)
 async def chat_completions(request: ChatCompletionRequest):
     try:
         # Extract the last user message
@@ -73,32 +64,39 @@ async def chat_completions(request: ChatCompletionRequest):
         # Log user input
         logger.info(f"User: {last_message}")
 
-        configurable = {"configurable": {"thread_id": "1", "user_id": "1"}}
+        # configurable = {"configurable": {"thread_id": "1", "user_id": "1"}}
         # Process agent response
         final_response = None
-        for step in agent_executor.stream(
-            # {"messages": [HumanMessage(content=last_message)]},
+
+        response = await ainvoke_agent(
+            agent_executor,
             {"messages": request.model_dump()["messages"][-10:]},
-            config=configurable,
-            stream_mode="values",
-        ):
-            final_response = step["messages"][-1]
-            # logger.info(f"Bot: {final_response}")
+            # config=configurable,
+        )
+        final_response = response["messages"][-1]
+        # for step in agent_executor.stream(
+        #     # {"messages": [HumanMessage(content=last_message)]},
+        #     {"messages": request.model_dump()["messages"][-10:]},
+        #     # config=configurable,
+        #     stream_mode="values",
+        # ):
+        #     final_response = step["messages"][-1]
+        # logger.info(f"Bot: {final_response}")
 
         # Log final response
         logger.info(f"Bot: {final_response}")
 
         # Format response in OpenAI-compatible format
-        response = ChatCompletionResponse(
+        response = ChatCompletion(
             id="chatcmpl-gsv",
             created=int(pathlib.Path(__file__).stat().st_mtime),
             model=request.model,
             choices=[
                 Choice(
                     index=0,
-                    message=AssistantMessage(
+                    message=ChatCompletionMessage(
                         role="assistant",
-                        content=final_response.content,
+                        content=final_response.content if final_response else "",
                         refusal=None,
                         annotations=[],
                     ),
@@ -106,13 +104,14 @@ async def chat_completions(request: ChatCompletionRequest):
                     finish_reason="stop",
                 )
             ],
-            usage=Usage(
-                prompt_tokens=0,
-                completion_tokens=0,
-                total_tokens=0,
-                prompt_tokens_details=TokenDetails(),
-                completion_tokens_details=CompletionTokenDetails(),
-            ),
+            # usage=Usage(
+            #     prompt_tokens=0,
+            #     completion_tokens=0,
+            #     total_tokens=0,
+            #     prompt_tokens_details=TokenDetails(),
+            #     completion_tokens_details=CompletionTokenDetails(),
+            # ),
+            object="chat.completion",
             service_tier="default",
         )
 

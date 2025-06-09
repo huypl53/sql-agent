@@ -39,17 +39,18 @@ async def get_orchestrator_executor() -> CompiledGraph:
     orchestrator_executor = adapter_class(
         model=app_config.orchestrator.model,
         tools=[
-            *base_tools,
+            # *base_tools,
             *mcp_tools,
-            create_handoff_tool(
-                agent_name="clarifier",
-                description="Khi người dùng hỏi, đưa câu hỏi về `clarifier` để làm rõ yêu cầu của người dùng",
-            ),
+            # create_handoff_tool(
+            #     agent_name="clarifier",
+            #     description="Khi người dùng hỏi, đưa câu hỏi về `clarifier` để làm rõ yêu cầu của người dùng",
+            # ),
         ],
-        checkpointer=checkpointer,
+        # checkpointer=checkpointer,
         prompt=OrchestratorConstant.orchestrator_system_prompt.format(),
         name="orchestrator",
     )
+    return orchestrator_executor
 
     clarifier_executor = adapter_class(
         model=app_config.orchestrator.model,

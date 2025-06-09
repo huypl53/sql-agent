@@ -193,7 +193,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 if not os.path.exists(settings.logging.log_dir):
-    os.makedirs(settings.logging.log_dir)
+    os.makedirs(settings.logging.log_dir, exist_ok=True)
 
 turn_logger = TurnLogger(settings.turn_log_file)
 
