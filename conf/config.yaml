@@ -5,6 +5,26 @@ server:
   reload: true
   workers: 1
 
+
+mode:  ${env:MODE, 'dev'}
+
+schema_path: ${env:SCHEMA_PATH}
+database: 
+    dialect:  ${env:DB_DIALECT, 'mysql'}
+    conn:  ${env:DB_CONN}
+
+
+llm: 
+  provider: {$env:LLM_MODEL_PROVIDER,'google_genai'}  
+  model: {$env:LLM_MODEL,'gemini-2.0-flash'}
+
+
+turn_log_file: ${env:TURN_LOG_FILE,  './logs/turn_log.csv' } 
+
+orchestrator: 
+  model: "google_genai:gemini-2.0-flash"
+
+####
 candidate_generations:
   - 
     prompt_type: "direct_generation"
@@ -65,12 +85,16 @@ mcp_servers:
     url: "http://127.0.0.1:8000/sse"
     transport: "sse"
     
-orchestrator:
-  # model: "mistralai:mistral-small-latest"
-  model: "google_genai:gemini-2.0-flash"
   
 
 vector_store:
   collection_name: "gsv"
   persistent_dir: "/mnt/Code/code/AI/agentic-AI/SQL-QA/data/vector/gsv"
   embedding_model: "hiieu/halong_embedding"
+
+logging:
+  log_dir: './logs/'
+  level: 'INFO'
+  max_bytes:  ${env:LOG_MAX_BYTES}
+  backup_count:  ${env:LOG_BACKUP_COUNT}
+
