@@ -24,6 +24,8 @@ logger = get_logger(__name__)
     ),
 )
 async def ainvoke_agent(
-    agent_executor: CompiledGraph, messages: List[Dict[str, Any]], config: dict
+    agent_executor: CompiledGraph,
+    messages: Dict[str, List[Any]],
+    config: dict | None = None,
 ):
     return await agent_executor.ainvoke(messages, config)

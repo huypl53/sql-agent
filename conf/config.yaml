@@ -19,7 +19,7 @@ llm:
   model: {$env:LLM_MODEL,'gemini-2.0-flash'}
 
 
-turn_log_file: ${env:TURN_LOG_FILE,  './logs/turn_log.csv' } 
+turn_log_file: ${env:TURN_LOG_FILE, './logs/turn_log.csv'} 
 
 orchestrator: 
   model: "google_genai:gemini-2.0-flash"

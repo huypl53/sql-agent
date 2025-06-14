@@ -7,19 +7,21 @@ from tqdm import tqdm
 from sql_qa.config import get_app_config, turn_logger
 from shared.logger import get_main_logger, with_a_turn_logger
 
+from sql_qa.state import Text2SqlResult
+
 logger = get_main_logger(__name__, log_file="./logs/cli.log")
 
-from sql_qa.runner import Runner, RunnerResult
+from sql_qa.text2sql.sql_agent import SqlAgent
 
 app_config = get_app_config()
 
 logger.info(
     "--------------------------------Starting CLI--------------------------------"
 )
-logger.info(json.dumps(app_config.model_dump(), indent=4, ensure_ascii=False))
+logger.info(app_config)
 
 
-runner = Runner(app_config)
+sql_agent = SqlAgent(app_config)
 
 
 @click.group()
@@ -40,10 +42,10 @@ def cli():
 
 
 @with_a_turn_logger(turn_logger)
-def run_turn(user_question: str) -> RunnerResult:
-    response = runner.run(user_question)
+def run_turn(user_question: str) -> Text2SqlResult:
+    response = sql_agent.run(user_question)
     if response.is_success:
-        print(f"Bot: {response.final_result}")
+        print(f"Bot: {response[ 'final_result' ]}")
     else:
         print(
             f"Failed to generate a response. Please try again. Error: {response.error}"
@@ -99,16 +101,6 @@ def benchmark(file):
     logger.info(f"Results saved to {output_file}")
 
 
-def extract_table_name_list(text):
-    try:
-        table_names = text.split(", ")
-    except:
-        # Wrong format
-        return None
-    # print(table_names, text)
-    return table_names
-
-
 @app.command()
 def serve():
     import os
@@ -140,23 +132,23 @@ def mcp_server(transport, port, host, path, mock):
 
     mcp = FastMCP(name="Text2SQL")
     if mock:
-        mcp.add_tool(
-            name="retrieve_data",
-            description="Database query tool. Analyze the input question then generate a SQL query, execute it and return the result",
-            fn=lambda input_question="cho tôi doanh số của từng cơ sở trong tháng 4 tính theo từng ngày": """
+        mcp.tool(
+            lambda user_question="cho tôi doanh số của từng cơ sở trong tháng 4 tính theo từng ngày": """
 [(datetime.date(2025, 4, 1), 'Chi nhánh Hà Đông', Decimal('164000')), (datetime.date(2025, 4, 2), 'Chi nhánh Hà Đông', Decimal('307000')), (datetime.date(2025, 4, 3), 'Chi nhánh Hà Đông', Decimal('300000')), (datetime.date(2025, 4, 4), 'Chi nhánh Hà Đông', Decimal('150000')), (datetime.date(2025, 4, 5), 'Chi nhánh Hà Đông', Decimal('900000')), (datetime.date(2025, 4, 6), 'Chi nhánh Cầu Giấy', Decimal('1331000')), (datetime.date(2025, 4, 6), 'Chi nhánh Hà Đông', Decimal('0')), (datetime.date(2025, 4, 7), 'Chi nhánh Hà Đông', Decimal('1725350')), (datetime.date(2025, 4, 8), 'Chi nhánh Hà Đông', Decimal('1260000')), (datetime.date(2025, 4, 9), 'Chi nhánh Hà Đông', Decimal('131314000')), (datetime.date(2025, 4, 10), 'Chi nhánh Hà Đông', Decimal('797500')), (datetime.date(2025, 4, 12), 'Chi nhánh Hà Đông', Decimal('3000')), (datetime.date(2025, 4, 13), 'Chi nhánh Cầu Giấy', Decimal('330000')), (datetime.date(2025, 4, 14), 'Chi nhánh Hà Đông', Decimal('210000')), (datetime.date(2025, 4, 15), 'Chi nhánh Hà Đông', Decimal('662500')), (datetime.date(2025, 4, 16), 'Chi nhánh Cầu Giấy', Decimal('7000')), (datetime.date(2025, 4, 16), 'Chi nhánh Hà Đông', Decimal('787000')), (datetime.date(2025, 4, 17), 'Chi nhánh Hà Đông', Decimal('666500')), (datetime.date(2025, 4, 18), 'Chi nhánh Hà Đông', Decimal('500')), (datetime.date(2025, 4, 19), 'Chi nhánh Cầu Giấy', Decimal('676000')), (datetime.date(2025, 4, 19), 'Chi nhánh Hà Đông', Decimal('666000')), (datetime.date(2025, 4, 21), 'Chi nhánh Cầu Giấy', Decimal('1143960')), (datetime.date(2025, 4, 21), 'Chi nhánh Hà Đông', Decimal('334000')), (datetime.date(2025, 4, 22), 'Chi nhánh Cầu Giấy', Decimal('320070')), (datetime.date(2025, 4, 23), 'Chi nhánh Cầu Giấy', Decimal('715000'))]
             """,
-        )
-    else:
-        mcp.add_tool(
             name="retrieve_data",
             description="Database query tool. Analyze the input question then generate a SQL query, execute it and return the result",
-            fn=run_turn,
+        )
+    else:
+        mcp.tool(
+            run_turn,
+            name="retrieve_data",
+            description="Database query tool. Analyze the input question then generate a SQL query, execute it and return the result",
         )
 
     if transport == "stdio":
         logger.info(f"Running server on stdio")
-        mcp.run()
+        mcp.run(transport=transport)
     elif transport == "streamable-http":
         logger.info(f"Running server on streamable-http on {host}:{port}{path}")
         mcp.run(transport=transport, port=port, host=host, path=path)

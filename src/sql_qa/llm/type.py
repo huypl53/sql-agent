@@ -1,12 +1,13 @@
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import List, Optional, TypedDict
+
+# from pydantic import BaseModel
 
 
-class LlmResponse(BaseModel):
+class LlmResponse(TypedDict):
     pass
 
 
-class GenerationResult(BaseModel):
+class GenerationResult(TypedDict):
     sql: Optional[str]
     execution_result: Optional[str]
     is_correct: bool

@@ -42,6 +42,9 @@ dependencies = [
     "nltk>=3.9.1",
     "mycli>=1.29.2",
     "langchain-chroma>=0.1.2",
+    "colorama>=0.4.6",
+    "langgraph-supervisor>=0.0.27",
+    "langgraph-prebuilt>=0.2.2",
 ]
 
 [build-system]

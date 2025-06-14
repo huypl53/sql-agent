@@ -7,8 +7,6 @@ from sql_qa.utils.invocation import ainvoke_agent
 
 logger = get_logger("ui", log_file="./logs/")
 
-from shared.db import get_db
-
 # Initialize the event loop
 if "loop" not in st.session_state:
     st.session_state.loop = asyncio.new_event_loop()

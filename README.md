@@ -141,11 +141,21 @@ curl -X POST http://localhost:8000/v1/chat/completions \
 # UI version
 ## Start mpc-chart-server
 mcp-server-chart --transport sse --port 1122
-## Start MCP SQL server
-uv run text2sql.py mcp-server --transport sse
 
-## Start main app - ongoing
-uv run streamlit run ./src/sql_qa/ui.py
+## Start MCP SQL server
+uv run -m sql_qa.serving.text2sql mcp-server --transport sse
+
+## Start MCP retrieval leveled questions server
+
+CHROMA_HF_MODEL=hiieu/halong_embedding uv run \
+--directory /mnt/Code/code/AI/agentic-AI/MCP/chroma-mcp/ \
+chroma-mcp \
+--client-type persistent \
+--data-dir  /mnt/Code/code/AI/agentic-AI/SQL-QA/data/vector/gsv
+
+
+## Start streamlit app
+uv run streamlit run ./ui.py
 
 ## Start cli app
 uv run ./orchestrator.py
@@ -157,7 +167,7 @@ uv run ./orchestrator.py
 ```bash
 
 # Benchmark 
-uv run ./cli.py benchmark --file data/GSV/generated-data/gen_success_data.csv
+uv run ./text2sql.py benchmark --file data/GSV/generated-data/gen_success_data.csv
 
 # Evaluation
 # For separate files

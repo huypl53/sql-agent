@@ -4,7 +4,7 @@ from shared.logger import get_logger
 
 
 from sql_qa.config import get_app_config, turn_logger
-from sql_qa.llm.adapter import get_adapter_class
+from sql_qa.llm.adapter import get_react_agent
 from sql_qa.llm.generation import LLMGeneration
 from sql_qa.llm.type import GenerationResult, SQLGenerationResponse
 from sql_qa.prompt.constant import Text2SqlConstant
@@ -22,7 +22,7 @@ class StategyFactory:
         self.return_all = return_all
 
         self.merger_adapter = (
-            get_adapter_class(merger_config.model)(
+            get_react_agent(
                 model=merger_config.model,
                 tools=[],
                 prompt=Text2SqlConstant.system.format(

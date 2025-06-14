@@ -1,8 +1,8 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 from shared.db import get_db
 from sql_qa.config import get_app_config
-from sql_qa.llm.adapter import get_adapter_class
+from sql_qa.llm.adapter import get_react_agent
 from sql_qa.llm.type import (
     GenerationResult,
     SQLGenerationResponse,
@@ -37,22 +37,19 @@ class LLMGeneration:
         self.prompt_type = prompt_type
 
         # model: str = query_validation_kwargs.get("model")
-        self.query_validation_adapter = get_adapter_class(
-            query_validation_kwargs.get("model")
-        )(
-            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        self.query_validation_adapter = get_react_agent(
+            model=str(query_validation_kwargs.get("model")),
             tools=self.tools,
             prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
             ),
             response_format=SQLQueryValidationResponse,
             **query_validation_kwargs,
-            # checkpointer=checkpointer,
         )
 
         # model: str = query_fixer_kwargs.get("model")
-        self.query_fixer_adapter = get_adapter_class(query_fixer_kwargs.get("model"))(
-            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        self.query_fixer_adapter = get_react_agent(
+            model=str(query_fixer_kwargs.get("model")),
             tools=self.tools,
             prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
@@ -63,8 +60,8 @@ class LLMGeneration:
         )
 
         # model: str = generation_kwargs.get("model")
-        self.generation_adapter = get_adapter_class(generation_kwargs.get("model"))(
-            # model=f"{app_config.llm.provider}:{app_config.llm.model}",
+        self.generation_adapter = get_react_agent(
+            model=str(generation_kwargs.get("model")),
             tools=self.tools,
             prompt=Text2SqlConstant.system.format(
                 dialect=app_config.database.dialect.upper()
