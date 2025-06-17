@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 import sys
 from typing import Optional
 from pathlib import Path
@@ -11,145 +11,55 @@ from collections import OrderedDict
 import tempfile
 import shutil
 
-# Global main logger instance
-_main_logger = None
+csv.field_size_limit(sys.maxsize)
 
 
-def get_timestamped_log_file(log_dir: str, prefix: str = "run") -> str:
-    """
-    Generate a timestamped log file path.
 
-    Args:
-        log_dir: Directory where log files will be stored
-        prefix: Prefix for the log file name (default: "run")
+# --- Loguru configuration ---
+LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+    "<level>{level: <8}</level> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+    "<level>{message}</level>"
+)
 
-    Returns:
-        str: Path to the log file with timestamp
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return str(Path(log_dir) / f"{prefix}_{timestamp}.log")
-
-
-def get_main_logger(
-    name: str = "main",
-    level: Optional[int] = None,
+def configure_logger(
     log_file: Optional[str] = "./logs/",
-    max_bytes: int = 5 * 1024 * 1024,  # 5MB default
-    backup_count: int = 5,  # Keep 5 backup files by default
-) -> logging.Logger:
-    """
-    Get or create the main logger instance.
+    level: str = "INFO",
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 5,
+):
+    logger.remove()  # Remove default handler
 
-    Args:
-        name: The name of the main logger (default: "main")
-        level: Optional logging level. If not provided, uses INFO level
-        log_file: Path to log file or directory. If directory is provided,
-                 a timestamped log file will be created in that directory.
-                 If a specific file path is provided, that exact file will be used.
-        max_bytes: Maximum size of each log file before rotation
-        backup_count: Number of backup files to keep
+    # Console handler
+    logger.add(sys.stdout, level=level, format=LOG_FORMAT, enqueue=True, backtrace=True, diagnose=True)
 
-    Returns:
-        logging.Logger: The main logger instance
-    """
-    global _main_logger
-    if _main_logger is None:
-        _main_logger = get_logger(
-            name=name,
-            level=level,
-            log_file=log_file,
-            max_bytes=max_bytes,
-            backup_count=backup_count,
-            propagate=False,  # Main logger should not propagate to root
-        )
-    return _main_logger
-
-
-def get_logger(
-    name: str,
-    level: Optional[int] = None,
-    log_file: Optional[str] = None,
-    max_bytes: int = 5 * 1024 * 1024,  # 5MB default
-    backup_count: int = 5,  # Keep 5 backup files by default
-    propagate: bool = True,  # Whether to propagate to main logger
-    use_console: bool = True,  # Whether to use console handler
-) -> logging.Logger:
-    """
-    Get a configured logger instance.
-
-    Args:
-        name: The name of the logger (typically __name__ of the calling module)
-        level: Optional logging level. If not provided, uses INFO level
-        log_file: Optional path to log file or directory. If directory is provided,
-                 a timestamped log file will be created in that directory.
-                 If a specific file path is provided, that exact file will be used.
-        max_bytes: Maximum size of each log file before rotation (default: 10MB)
-        backup_count: Number of backup files to keep (default: 5)
-        propagate: Whether to propagate logs to the main logger (default: True)
-        use_console: Whether to use console handler (default: True)
-
-    Returns:
-        logging.Logger: Configured logger instance
-    """
-    # Create logger
-    logger = logging.getLogger(name)
-
-    # If logger already has handlers, return it to avoid duplicate handlers
-    if logger.handlers:
-        return logger
-
-    # Set default level if not provided
-    if level is None:
-        level = logging.INFO
-
-    logger.setLevel(level)
-
-    # Create formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    # Create console handler with formatting
-    if use_console:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(level)
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
-    # Add file handler if log_file is provided
+    # File handler
     if log_file:
         log_path = Path(log_file)
-
-        # Create parent directory if it doesn't exist
         log_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # If path ends with / or \, use timestamped file
         if log_path.is_dir() or str(log_path).endswith(("/", "\\")):
-            log_file = get_timestamped_log_file(str(log_path), prefix=name)
-
-        # Use RotatingFileHandler instead of FileHandler
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = str(log_path / f"run_{timestamp}.log")
+        logger.add(
+            log_file,
+            rotation=max_bytes,
+            retention=backup_count,
+            level=level,
+            format=LOG_FORMAT,
+            encoding="utf-8",
+            enqueue=True,
+            backtrace=True,
+            diagnose=True,
         )
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
 
-    # Set up propagation to main logger
-    if propagate:
-        main_logger = get_main_logger()
-        # Only set up propagation if this is not the main logger itself
-        if logger.name != main_logger.name:
-            logger.propagate = True
-            # Ensure the logger hierarchy is properly set up
-            if not logger.parent or logger.parent.name != main_logger.name:
-                logger.parent = main_logger
-    else:
-        logger.propagate = False
+configure_logger(log_file="logs", level="INFO")
 
+def get_main_logger(*args, **kwargs):
     return logger
 
+def get_logger(*args, **kwargs):
+    return logger
 
 class TurnLogger:
     delimiter = (

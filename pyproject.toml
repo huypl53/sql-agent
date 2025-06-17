@@ -45,6 +45,7 @@ dependencies = [
     "colorama>=0.4.6",
     "langgraph-supervisor>=0.0.27",
     "langgraph-prebuilt>=0.2.2",
+    "loguru>=0.7.3",
 ]
 
 [build-system]

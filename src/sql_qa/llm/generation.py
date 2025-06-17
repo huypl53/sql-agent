@@ -2,17 +2,18 @@ from typing import Literal, Optional, Tuple, Dict, Any, cast, Union
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.types import Command
-from shared.db import get_db
+from shared.db import get_db, execute_sql
 from sql_qa.config import get_app_config
 from sql_qa.llm.adapter import get_react_agent
 from sql_qa.llm.type import (
-    GRAPH_NODE,
+    GEN_GRAPH_NODE,
     CandidateGenState,
     SQLGenerationResponse,
     SQLQueryFixerResponse,
     SQLQueryValidationResponse,
 )
 from sql_qa.prompt.constant import Text2SqlConstant
+
 
 from shared.logger import get_logger
 from sql_qa.config import turn_logger
@@ -78,19 +79,19 @@ class LLMGeneration:
 
     def _build_graph(self):
         graph_builder = StateGraph(CandidateGenState)
-        graph_builder.add_node(GRAPH_NODE.init, self.init_state)
-        graph_builder.add_node(GRAPH_NODE.route, self.route)
-        graph_builder.add_node(GRAPH_NODE.candidate, self.gen_candidate)
-        graph_builder.add_node(GRAPH_NODE.validate, self.validate_generation)
-        graph_builder.add_node(GRAPH_NODE.should_fix, self.should_fix)
-        graph_builder.add_node(GRAPH_NODE.fix, self.fix_query)
+        graph_builder.add_node(GEN_GRAPH_NODE.init, self.init_state)
+        graph_builder.add_node(GEN_GRAPH_NODE.route, self.route)
+        graph_builder.add_node(GEN_GRAPH_NODE.candidate, self.gen_candidate)
+        graph_builder.add_node(GEN_GRAPH_NODE.validate, self.validate_generation)
+        graph_builder.add_node(GEN_GRAPH_NODE.should_fix, self.should_fix)
+        graph_builder.add_node(GEN_GRAPH_NODE.fix, self.fix_query)
 
-        graph_builder.add_edge(START, GRAPH_NODE.init)
-        graph_builder.add_edge(GRAPH_NODE.init, GRAPH_NODE.route)
-        graph_builder.add_edge(GRAPH_NODE.route, GRAPH_NODE.candidate)
-        graph_builder.add_edge(GRAPH_NODE.candidate, GRAPH_NODE.validate)
-        graph_builder.add_edge(GRAPH_NODE.validate, GRAPH_NODE.should_fix)
-        graph_builder.add_edge(GRAPH_NODE.should_fix, END)
+        graph_builder.add_edge(START, GEN_GRAPH_NODE.init)
+        graph_builder.add_edge(GEN_GRAPH_NODE.init, GEN_GRAPH_NODE.route)
+        graph_builder.add_edge(GEN_GRAPH_NODE.route, GEN_GRAPH_NODE.candidate)
+        graph_builder.add_edge(GEN_GRAPH_NODE.candidate, GEN_GRAPH_NODE.validate)
+        graph_builder.add_edge(GEN_GRAPH_NODE.validate, GEN_GRAPH_NODE.should_fix)
+        graph_builder.add_edge(GEN_GRAPH_NODE.should_fix, END)
 
         self.graph = graph_builder.compile()
 
@@ -133,7 +134,7 @@ class LLMGeneration:
         if run_iter > _MAX_GEN_TIME:
             return Command(goto=END, update=update)
         else:
-            return Command(update=update, goto=GRAPH_NODE.candidate)
+            return Command(update=update, goto=GEN_GRAPH_NODE.candidate)
 
     def gen_candidate(
         self, state: CandidateGenState
@@ -203,13 +204,13 @@ class LLMGeneration:
                 "explaination": explaination,
                 "logs": [
                     {
-                        "name": f"{self.prompt_type}_{GRAPH_NODE.candidate}",
+                        "name": f"{self.prompt_type}_{GEN_GRAPH_NODE.candidate}",
                         "value": structured_generation_response,
                     }
                 ],
                 "correct_thoughts": [
                     {
-                        "name": f"{self.prompt_type}_{GRAPH_NODE.candidate}",
+                        "name": f"{self.prompt_type}_{GEN_GRAPH_NODE.candidate}",
                         "value": structured_generation_response,
                     }
                 ],
@@ -267,13 +268,13 @@ class LLMGeneration:
                 update={
                     "logs": [
                         {
-                            "name": GRAPH_NODE.validate,
+                            "name": GEN_GRAPH_NODE.validate,
                             "value": explaination,
                         }
                     ],
                     "correct_thoughts": [
                         {
-                            "name": GRAPH_NODE.validate,
+                            "name": GEN_GRAPH_NODE.validate,
                             "value": structured_query_validation_response,
                         }
                     ],
@@ -285,7 +286,7 @@ class LLMGeneration:
             update={
                 "logs": [
                     {
-                        "name": GRAPH_NODE.validate,
+                        "name": GEN_GRAPH_NODE.validate,
                         "value": structured_query_validation_response,
                     }
                 ]
@@ -293,8 +294,8 @@ class LLMGeneration:
         )
 
     def should_fix(self, state: CandidateGenState) -> Command[Literal[END, "fix"]]:
-        execution_result, execution_result_is_sql_correct = self.execute_sql(
-            state["sql"]
+        execution_result, execution_result_is_sql_correct = execute_sql(
+            self.db, state["sql"]
         )
         updates = (
             {
@@ -305,7 +306,7 @@ class LLMGeneration:
 
         if not execution_result_is_sql_correct:
             return Command(
-                goto=GRAPH_NODE.fix,
+                goto=GEN_GRAPH_NODE.fix,
                 update=updates,
             )
 
@@ -364,7 +365,7 @@ class LLMGeneration:
         )
         sql, fix_explaination = structured_query_fixing_response
 
-        exec_result, is_success = self.execute_sql(sql)
+        exec_result, is_success = execute_sql(self.db, sql)
         run_iter = state["run_iter"]
         update = {
             "run_iter": run_iter + 1,
@@ -373,7 +374,7 @@ class LLMGeneration:
             "execution_result": exec_result,
             "logs": [
                 {
-                    "name": GRAPH_NODE.fix,
+                    "name": GEN_GRAPH_NODE.fix,
                     "value": (
                         f"{ structured_query_fixing_response}" "---" f"{exec_result}"
                     ),
@@ -382,7 +383,7 @@ class LLMGeneration:
             "correct_thoughts": (
                 [
                     {
-                        "name": GRAPH_NODE.fix,
+                        "name": GEN_GRAPH_NODE.fix,
                         "value": (
                             f"{ structured_query_fixing_response}"
                             "---"
@@ -396,22 +397,10 @@ class LLMGeneration:
         }
         if not is_success and run_iter < _MAX_GEN_TIME:
             return Command(
-                goto=GRAPH_NODE.fix,
+                goto=GEN_GRAPH_NODE.fix,
                 update=update,
             )
         return Command(goto=END, update=update)
-
-    def execute_sql(self, sql: str) -> Tuple[Any, bool]:
-        """
-        Return:
-            execution_result [Any]
-            is_success [bool]
-        """
-        try:
-            execution_result = self.db.run(sql)
-            return execution_result, True
-        except Exception as e:
-            return str(e), False
 
 
 if __name__ == "__main__":

@@ -83,3 +83,4 @@ Chinook.db
 
 *.json
 Session.vim
+tmp/

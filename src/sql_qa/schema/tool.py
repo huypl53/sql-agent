@@ -16,8 +16,3 @@ class EnhancementResponse(BaseModel):
 
     enhanced_msg: Optional[str]
     clarification_feedback: Optional[str]
-
-
-class Text2SqlState(Text2SqlResult):
-    messages: List[Dict[str, Any]]
-

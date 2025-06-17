@@ -1,3 +1,4 @@
+import asyncio
 import click
 import json
 import pandas as pd
@@ -7,7 +8,7 @@ from tqdm import tqdm
 from sql_qa.config import get_app_config, turn_logger
 from shared.logger import get_main_logger, with_a_turn_logger
 
-from sql_qa.state import Text2SqlResult
+from sql_qa.state import SqlAgentState
 
 logger = get_main_logger(__name__, log_file="./logs/cli.log")
 
@@ -33,22 +34,25 @@ def app():
 def cli():
     # print(f"Hello, {name}! This is the CLI for the SQL QA app.")
 
-    while (user_question := input("Enter a SQL question: ").lower()) not in [
-        "exit",
-        "quit",
-        "q",
-    ]:
-        run_turn(user_question)
+    async def arun():
+        while (user_question := input("Enter a SQL question: ").lower()) not in [
+            "exit",
+            "quit",
+            "q",
+        ]:
+            await run_turn(user_question)
+
+    asyncio.run(arun())
 
 
 @with_a_turn_logger(turn_logger)
-def run_turn(user_question: str) -> Text2SqlResult:
-    response = sql_agent.run(user_question)
-    if response.is_success:
+async def run_turn(user_question: str) -> SqlAgentState:
+    response = await sql_agent.arun(user_question)
+    if response["is_success"]:
         print(f"Bot: {response[ 'final_result' ]}")
     else:
         print(
-            f"Failed to generate a response. Please try again. Error: {response.error}"
+            f"Failed to generate a response. Please try again. Error: {response['error']}"
         )
     return response
 
@@ -84,7 +88,7 @@ def benchmark(file):
         try:
             response = run_turn(question)
             # Update dataframe in memory
-            df.at[idx, "generated_sql_query"] = response.sql_query
+            df.at[idx, "generated_sql_query"] = response.final_sql
             df.at[idx, "generated_query_result"] = response.final_result
             df.at[idx, "generated_sql_error"] = response.error
             df.at[idx, "generated_raw_result"] = response.raw_result

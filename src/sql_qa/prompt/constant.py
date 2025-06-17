@@ -239,7 +239,8 @@ class Text2SqlConstant:
     **Đầu vào**:
     - Câu hỏi SQL: {{question}}
     - Cấu trúc cơ sở dữ liệu: {{schema}}
-    - Bằng chứng: {{evidence}}
+    - Bằng chứng: 
+{{evidence}}
     - Nhắc lại câu hỏi SQL: {{question}}
     - Hệ quản trị cơ sở dữ liệu: {app_config.database.dialect.upper()}
 
@@ -390,7 +391,8 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
     *   Sử dụng `AS` (Alias) để đặt tên cột thân thiện hơn nếu tên gốc khó hiểu.
 ---
 **Cấu trúc cơ sở dữ liệu:** {{schema}}
-**Bằng chứng (Các bản ghi mẫu và mô tả cột):** {{evidence}}
+**Bằng chứng (Các bản ghi mẫu và mô tả cột):** 
+{{evidence}}
 **Câu hỏi SQL:** {{question}}
 
 ---
@@ -471,7 +473,8 @@ Bạn là một chuyên gia chuyển đổi câu hỏi tự nhiên thành câu l
 ---
 
 **Cấu trúc cơ sở dữ liệu:** {{schema}}
-**Bằng chứng (Các bản ghi mẫu và mô tả cột):** {{evidence}}
+**Bằng chứng (Các bản ghi mẫu và mô tả cột):** 
+{{evidence}}
 
 **Câu hỏi SQL:** {{question}}
 
@@ -558,7 +561,8 @@ Các câu lệnh tạo bảng
 ************************** 
 Câu hỏi gốc là: 
 - Câu hỏi: {{question}} 
-- Bằng chứng: {{evidence}} 
+- Bằng chứng: 
+{{evidence}} 
 - Câu truy vấn SQL đã thực thi là: {{query}} 
 - Kết quả thực thi: {{result}} 
 ************************** 
