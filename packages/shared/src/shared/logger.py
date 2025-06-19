@@ -1,72 +1,154 @@
-from loguru import logger
+import logging
+import logging.handlers
+import os.path
 import sys
-from typing import Optional
-from pathlib import Path
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 import csv
 import os
 from functools import wraps
-from collections import OrderedDict
 import tempfile
 import shutil
+import subprocess
 
+_LOG_BASE_NAME = ""
 csv.field_size_limit(sys.maxsize)
+CSV_DEMILITER = "||"
+
+def get_commit_hash():
+    """Get the current git commit hash."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
+    except FileNotFoundError:
+        return "git-not-found"
 
 
+def get_short_commit_hash():
+    """Get the short version of the current git commit hash."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return "unknown"
+    except FileNotFoundError:
+        return "git-not-found"
 
-# --- Loguru configuration ---
-LOG_FORMAT = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-    "<level>{level: <8}</level> | "
-    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
-    "<level>{message}</level>"
-)
 
-def configure_logger(
-    log_file: Optional[str] = "./logs/",
-    level: str = "INFO",
+def get_commit_timestamp_basename():
+    """Generate basename with commit hash and timestamp."""
+    global _LOG_BASE_NAME
+    if not _LOG_BASE_NAME:
+        commit_hash = get_short_commit_hash()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        _LOG_BASE_NAME = f"{commit_hash}_{timestamp}"
+    return _LOG_BASE_NAME
+
+
+def create_run_log_csv(csv_path="run_logs.csv"):
+    """Create CSV file for tracking run logs and descriptions."""
+    if not os.path.exists(csv_path):
+        with open(csv_path, "w", newline="") as f:
+            import csv
+
+            writer = csv.writer(f, delimiter=CSV_DEMILITER)
+            writer.writerow(["logfile_basename", "description"])
+    return csv_path
+
+
+def setup_logger_with_commit_info(
+    name="app",
+    level=logging.INFO,
+    log_dir="logs",
     max_bytes: int = 5 * 1024 * 1024,
     backup_count: int = 5,
 ):
-    logger.remove()  # Remove default handler
+    """Set up a logger that includes commit hash and timestamp-based filename."""
+
+    # Get commit information and basename
+    commit_hash = get_commit_hash()
+    short_hash = get_short_commit_hash()
+    basename = get_commit_timestamp_basename()
+
+    # Create log directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Create custom formatter
+    class CommitFormatter(logging.Formatter):
+        def format(self, record):
+            # Add commit info to the record
+            record.commit_hash = commit_hash
+            record.short_hash = short_hash
+            record.timestamp = datetime.now().isoformat()
+            return super().format(record)
+
+    # Set up logger
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # Clear existing handlers
+    logger.handlers.clear()
 
     # Console handler
-    logger.add(sys.stdout, level=level, format=LOG_FORMAT, enqueue=True, backtrace=True, diagnose=True)
+    console_handler = logging.StreamHandler()
+    console_formatter = CommitFormatter(
+        fmt="%(timestamp)s - %(name)s - %(levelname)s - [%(short_hash)s] - %(filename)s:%(lineno)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
 
-    # File handler
-    if log_file:
-        log_path = Path(log_file)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        if log_path.is_dir() or str(log_path).endswith(("/", "\\")):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            log_file = str(log_path / f"run_{timestamp}.log")
-        logger.add(
-            log_file,
-            rotation=max_bytes,
-            retention=backup_count,
-            level=level,
-            format=LOG_FORMAT,
-            encoding="utf-8",
-            enqueue=True,
-            backtrace=True,
-            diagnose=True,
-        )
+    # File handler with commit_hash_timestamp basename
+    log_filename = f"{basename}.log"
+    log_filepath = os.path.join(log_dir, log_filename)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_filepath, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+    )
+    file_formatter = CommitFormatter(
+        fmt="%(timestamp)s - %(name)s - %(levelname)s - [%(short_hash)s] - %(filename)s:%(lineno)d %(message)s"
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
 
-configure_logger(log_file="logs", level="INFO")
+    # Store info for reference
 
-def get_main_logger(*args, **kwargs):
+    setattr(logger, "basename", basename)
     return logger
 
-def get_logger(*args, **kwargs):
-    return logger
+
+def add_run_to_csv(basename, csv_path="run_logs.csv", description=""):
+    """Add a new run entry to the CSV file."""
+    with open(csv_path, "a", newline="") as f:
+        import csv
+
+        writer = csv.writer(f, delimiter=CSV_DEMILITER)
+        writer.writerow([basename, description])
+
+
+APP_NAME = "text2sql-bot"
+LOG_DIR = "./logs/"
+logger = setup_logger_with_commit_info(APP_NAME, log_dir=LOG_DIR)
+
 
 class TurnLogger:
-    delimiter = (
-        "\t"  # Using tab as delimiter which is less likely to appear in text content
-    )
+    delimiter = CSV_DEMILITER
 
-    def __init__(self, csv_file_path, identity_columns=None):
+    def __init__(
+        self,
+        csv_file_path=os.path.join(
+            LOG_DIR,
+            f"{get_commit_timestamp_basename()}_turn.csv",
+        ),
+        identity_columns=None,
+    ):
         """
         Initialize TurnLogger with optional identity columns.
 
@@ -76,8 +158,6 @@ class TurnLogger:
                             If None, defaults to ["created_date"].
                             Can include "id" for auto-incrementing row numbers.
         """
-        import os
-        from collections import OrderedDict
 
         print(f"csv_file_path: {os.path.abspath(csv_file_path)}")
         self.csv_file_path = csv_file_path
@@ -141,8 +221,6 @@ class TurnLogger:
         """
         Start a new turn by saving the current turn (if any) and initializing a new one.
         """
-        if self.current_row:
-            self.save_turn()
 
         # Initialize identity columns
         self.current_row = {}
@@ -274,36 +352,44 @@ def with_a_turn_logger(turn_logger: TurnLogger):
             turn_logger.new_turn()
             try:
                 result = func(*args, **kwargs)
-                turn_logger.save_turn()
                 return result
             except Exception as e:
                 turn_logger.log("error", f"Error: {e}")
-                turn_logger.save_turn()
                 raise e
+            finally:
+                turn_logger.save_turn()
 
         return wrapper
 
     return decorator
 
 
+# Create/update CSV tracking file
+CSV_RUN_LOG_BASE = f"{get_short_commit_hash()}_run.csv"
+CSV_RUN_LOG = os.path.join(LOG_DIR, CSV_RUN_LOG_BASE)
+
+csv_path = create_run_log_csv(CSV_RUN_LOG)
+run_log_basename = getattr(logger, "basename", CSV_RUN_LOG_BASE)
+
+add_run_to_csv(run_log_basename, csv_path)
+
 # Example usage:
 if __name__ == "__main__":
     # Example with timestamped log file in logs directory
-    logger = get_logger(__name__, log_file="logs")
+    # logger = get_logger(__name__, log_file="logs")
     logger.info("Logger initialized successfully")
     logger.debug("This is a debug message")
     logger.warning("This is a warning message")
     logger.error("This is an error message")
 
-    turn_logger = TurnLogger("turn_log_with_id_test.csv", identity_columns=["id"])
-    turn_logger.new_turn()
-    turn_logger.log("key1", "value1")
-    turn_logger.log("key2", "value2")
-    turn_logger.new_turn()
-    turn_logger.log("key1", "value3")
-    turn_logger.log("key3", "value4")
-    turn_logger.new_turn()
-    turn_logger.log("new_key1", "value5")
-    turn_logger.log("new_key2", "value6")
-    turn_logger.log("new_key3", "value8")
-    turn_logger.new_turn()  # Final save
+    turn_logger = TurnLogger(identity_columns=["id"])
+
+    @with_a_turn_logger(turn_logger)
+    def run_with_turnlogger(i):
+        # turn_logger.new_turn()
+        turn_logger.log(f"key{i}", f"value{i}")
+        turn_logger.log(f"key{i+1}", f"value{i}")
+        # turn_logger.new_turn()
+
+    for i in range(5):
+        run_with_turnlogger(i)
