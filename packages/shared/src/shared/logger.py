@@ -12,7 +12,7 @@ import subprocess
 
 _LOG_BASE_NAME = ""
 csv.field_size_limit(sys.maxsize)
-CSV_DEMILITER = "||"
+CSV_DEMILITER = "|"
 
 def get_commit_hash():
     """Get the current git commit hash."""
