@@ -1,11 +1,10 @@
 import asyncio
 import streamlit as st
-from shared.logger import get_logger
+from shared.logger import logger
 
 from orchestrator import get_orchestrator_executor
 from sql_qa.utils.invocation import ainvoke_agent
 
-logger = get_logger("ui", log_file="./logs/")
 
 # Initialize the event loop
 if "loop" not in st.session_state:

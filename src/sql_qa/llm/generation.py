@@ -1,4 +1,4 @@
-from typing import Literal, Optional, Tuple, Dict, Any, cast, Union
+from typing import Literal, Union
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.types import Command
@@ -13,14 +13,11 @@ from sql_qa.llm.type import (
     SQLQueryValidationResponse,
 )
 from sql_qa.prompt.constant import Text2SqlConstant
-
-
-from shared.logger import get_logger
+from shared.logger import logger
 from sql_qa.config import turn_logger
 
 from sql_qa.prompt.template import Role
 
-logger = get_logger(__name__)
 
 app_config = get_app_config()
 
@@ -261,7 +258,8 @@ class LLMGeneration:
         logger.info(
             f"Query validation structured result: {structured_query_validation_response}"
         )
-        is_sql_correct, explaination = structured_query_validation_response
+        is_sql_correct = structured_query_validation_response["is_sql_correct"]
+        explaination = structured_query_validation_response["explaination"]
         if is_sql_correct:
             return Command(
                 goto="should_fix",
@@ -297,7 +295,9 @@ class LLMGeneration:
         execution_result, execution_result_is_sql_correct = execute_sql(
             self.db, state["sql"]
         )
-        updates = (
+        update: CandidateGenState = {}
+
+        update.update(
             {
                 "execution_result": execution_result,
                 "is_sql_correct": execution_result_is_sql_correct,
@@ -307,12 +307,12 @@ class LLMGeneration:
         if not execution_result_is_sql_correct:
             return Command(
                 goto=GEN_GRAPH_NODE.fix,
-                update=updates,
+                update=update,
             )
 
         return Command(
             goto=END,
-            update=updates,
+            update=update,
         )
 
     def fix_query(self, state: CandidateGenState) -> Command[Literal["route", END]]:

@@ -1,16 +1,13 @@
 from typing import List, Literal, cast
-from langchain_core.messages.ai import subtract_usage
 from langgraph.graph.graph import CompiledGraph
 from langgraph.types import Command, Send
-from shared.logger import get_logger
+from shared.logger import logger
 from shared.db import get_db, execute_sql
-from sqlalchemy import update
-from sqlalchemy.schema import SetConstraintComment
 from sql_qa.config import get_app_config, turn_logger
 from sql_qa.llm.adapter import get_react_agent
 from sql_qa.llm.generation import LLMGeneration
 from sql_qa.llm.type import (
-    STRAT_GRAPH_NODE,
+    STRAT_GRAPH_NODE as NODE,
     CandidateGenState,
     SQLGenerationResponse,
     StrategyState,
@@ -20,8 +17,6 @@ from sql_qa.prompt.template import Role
 from langgraph.graph import END, START, StateGraph
 
 app_config = get_app_config()
-
-logger = get_logger(__name__)
 
 
 class StrategyFactory:
@@ -50,28 +45,23 @@ class StrategyFactory:
 
     def _build_graph(self):
         graph_builder = StateGraph(StrategyState)
-        # graph_builder.add_node(STRAT_GRAPH_NODE.route, self.route_to_strategy)
-        graph_builder.add_node(STRAT_GRAPH_NODE.strategy_gen, self.agenerate)
-        graph_builder.add_node(STRAT_GRAPH_NODE.merge, self.merge)
+        graph_builder.add_node(NODE.strategy_gen, self.agenerate)
+        graph_builder.add_node(NODE.merge, self.merge)
 
-        # graph_builder.add_edge(START, STRAT_GRAPH_NODE.route)
-        # graph_builder.add_edge(STRAT_GRAPH_NODE.route, STRAT_GRAPH_NODE.strategy_gen)
         graph_builder.add_conditional_edges(
-            START, self.route_to_strategy, [STRAT_GRAPH_NODE.strategy_gen]
+            START, self.route_to_strategy, [NODE.strategy_gen]
         )
-        graph_builder.add_edge(STRAT_GRAPH_NODE.strategy_gen, STRAT_GRAPH_NODE.merge)
-        graph_builder.add_edge(STRAT_GRAPH_NODE.merge, END)
+        graph_builder.add_edge(NODE.strategy_gen, NODE.merge)
+        graph_builder.add_edge(NODE.merge, END)
 
         self.graph = graph_builder.compile()
 
     async def agenerate(self, state: StrategyState) -> Command[Literal["merge"]]:
-        strategy_name = state["strategy"]
+        strategy = state["strategy"]
         try:
-            generator = [g for g in self.generators if g.prompt_type == strategy_name][
-                0
-            ]
+            generator = [g for g in self.generators if g.prompt_type == strategy][0]
         except:
-            logger.warning(f"No strategy found for: {strategy_name}")
+            logger.warning(f"No strategy found for: {strategy}")
             return Command(goto="merge")
         gen_graph = generator.graph
         gen_payload: CandidateGenState = {}
@@ -81,23 +71,30 @@ class StrategyFactory:
         result = await gen_graph.ainvoke(gen_payload)
         result = cast(CandidateGenState, result)
 
-        logger.info(
+        log_msg = (
             f"Generator {generator.prompt_type} result: {result['is_sql_correct']}."
             f"\nDetails: {result['sql']}. "
             f"\nExecution result: {result['execution_result']}"
         )
+        logger.info(log_msg)
+        turn_logger.log(strategy, log_msg)
+
         result["strategy"] = generator.prompt_type
 
         update: StrategyState = {}
-        update["logs"] = [
+        update.update(
             {
-                "strategy": strategy_name,
-                "thoughts": result["correct_thoughts"],
-                "sql": result["sql"],
-                "execution_result": result["execution_result"],
-                "is_success": bool(len(result["correct_thoughts"])),
+                "logs": [
+                    {
+                        "strategy": strategy,
+                        "thoughts": result["correct_thoughts"],
+                        "sql": result["sql"],
+                        "execution_result": result["execution_result"],
+                        "is_success": bool(len(result["correct_thoughts"])),
+                    }
+                ]
             }
-        ]
+        )
 
         return Command(
             goto="merge",
@@ -149,33 +146,29 @@ class StrategyFactory:
         exec_result, is_success = execute_sql(self._db, sql)
         update.update(
             {
-                "": "",
-
                 "logs": [
                     {
-                        "strategy": STRAT_GRAPH_NODE.merge,
+                        "strategy": NODE.merge,
                         "sql": sql,
                         "thoughts": [
                             {
-                                "name": STRAT_GRAPH_NODE.merge,
+                                "name": NODE.merge,
                                 "value": merger_structured_response["explaination"],
                             }
                         ],
                         "execution_result": exec_result,
                         "is_success": is_success,
                     }
-                ]
+                ],
             }
         )
         return Command(goto=END, update=update)
 
-    def route_to_strategy(
-        self, state: StrategyState
-    ) -> Literal[STRAT_GRAPH_NODE.strategy_gen]:
+    def route_to_strategy(self, state: StrategyState) -> Literal[NODE.strategy_gen]:
         logger.info(f"Running {len(self.generators)} generators")
 
         return [
-            Send(STRAT_GRAPH_NODE.strategy_gen, {**state, "strategy": s.prompt_type})
+            Send(NODE.strategy_gen, {**state, "strategy": s.prompt_type})
             for s in self.generators
         ]
 

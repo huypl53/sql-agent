@@ -4,15 +4,13 @@ import json
 import pandas as pd
 from tqdm import tqdm
 
-# from langgraph.checkpoint.memory import MemorySaver
+from sql_qa.agent.domain import QuestionDomainAgent, QuestionDomainAgentState
 from sql_qa.config import get_app_config, turn_logger
-from shared.logger import get_main_logger, with_a_turn_logger
+from shared.logger import logger, with_a_turn_logger
 
-from sql_qa.state import SqlAgentState
+from sql_qa.agent.sql import SqlAgentState
+from sql_qa.agent.sql import SqlAgent
 
-logger = get_main_logger(__name__, log_file="./logs/cli.log")
-
-from sql_qa.text2sql.sql_agent import SqlAgent
 
 app_config = get_app_config()
 
@@ -23,6 +21,7 @@ logger.info(app_config)
 
 
 sql_agent = SqlAgent(app_config)
+domain_agent = QuestionDomainAgent().graph
 
 
 @click.group()
@@ -40,14 +39,23 @@ def cli():
             "quit",
             "q",
         ]:
-            await run_turn(user_question)
+            await arun_turn(user_question)
 
     asyncio.run(arun())
 
 
 @with_a_turn_logger(turn_logger)
-async def run_turn(user_question: str) -> SqlAgentState:
-    response = await sql_agent.arun(user_question)
+async def arun_turn(user_question: str) -> SqlAgentState:
+    # domain_payload: QuestionDomainAgentState = {}
+    # domain_payload["user_question"] = user_question
+    # domain_payload["domain"] = "accountant"
+    # domain_response = await domain_agent.ainvoke(domain_payload)
+    # enhanced_question = domain_response["enhanced_question"]
+    turn_logger.log("question", user_question)
+    # turn_logger.log("domain_quesiont", enhanced_question)
+    # updated_question = user_question + "\n" + enhanced_question
+    question = user_question
+    response = await sql_agent.arun(question)
     if response["is_success"]:
         print(f"Bot: {response[ 'final_result' ]}")
     else:
@@ -59,50 +67,56 @@ async def run_turn(user_question: str) -> SqlAgentState:
 
 @app.command()
 @click.option("--file", type=click.File("r", encoding="utf-8"), required=True)
-def benchmark(file):
-    # Read CSV file with header
-    df = pd.read_csv(file, encoding="utf-8")
-    total_questions = len(df)
-    logger.info(f"Starting benchmark with {total_questions} questions")
+@click.option("--col-question", type=str, default="question")
+def benchmark(file, col_question):
+    async def arun():
+        # Read CSV file with header
+        df = pd.read_csv(file, encoding="utf-8")
 
-    # Initialize the runner
+        assert col_question in df.columns
+        total_questions = len(df)
+        logger.info(f"Starting benchmark with {total_questions} questions")
 
-    # Create output file with initial data
-    output_file = file.name.replace(".csv", "_results.csv")
-    df["generated_sql_query"] = None
-    df["generated_query_result"] = None
-    df["generated_sql_error"] = None
-    df["generated_raw_result"] = None
-    df.to_csv(output_file, index=False, encoding="utf-8")
+        # Initialize the runner
 
-    # Process each question and save results immediately
-    pbar = tqdm(
-        total=total_questions,
-        position=0,
-        leave=True,
-        desc="Processing questions",
-        unit="q",
-    )
+        # Create output file with initial data
+        output_file = file.name.replace(".csv", "_results.csv")
+        df["generated_sql_query"] = None
+        df["generated_query_result"] = None
+        df["generated_sql_error"] = None
+        # df["generated_domain_raw_result"] = None
+        df.to_csv(output_file, index=False, encoding="utf-8")
 
-    for idx, question in enumerate(df["question"]):
-        try:
-            response = run_turn(question)
-            # Update dataframe in memory
-            df.at[idx, "generated_sql_query"] = response.final_sql
-            df.at[idx, "generated_query_result"] = response.final_result
-            df.at[idx, "generated_sql_error"] = response.error
-            df.at[idx, "generated_raw_result"] = response.raw_result
-        except Exception as e:
-            logger.error(f"Error processing question {idx + 1}: {str(e)}")
-            df.at[idx, "generated_sql_error"] = str(e)
-        finally:
-            # Save after each question
-            df.to_csv(output_file, index=False, encoding="utf-8")
-            pbar.update(1)
-            pbar.set_description(f"Processed {pbar.n}/{total_questions} questions")
+        # Process each question and save results immediately
+        pbar = tqdm(
+            total=total_questions,
+            position=0,
+            leave=True,
+            desc="Processing questions",
+            unit="q",
+        )
 
-    pbar.close()
-    logger.info(f"Results saved to {output_file}")
+        for idx, question in enumerate(df[col_question]):
+            try:
+                response = await arun_turn(question)
+                # Update dataframe in memory
+                df.at[idx, "generated_sql_query"] = response["final_sql"]
+                df.at[idx, "generated_query_result"] = response["final_result"]
+                df.at[idx, "generated_sql_error"] = response["error"]
+                # df.at[idx, "generated_domain_raw_result"] = response["raw_result"]
+            except Exception as e:
+                logger.error(f"Error processing question {idx + 1}: {str(e)}")
+                df.at[idx, "generated_sql_error"] = str(e)
+            finally:
+                # Save after each question
+                df.to_csv(output_file, index=False, encoding="utf-8")
+                pbar.update(1)
+                pbar.set_description(f"Processed {pbar.n}/{total_questions} questions")
+
+        pbar.close()
+        logger.info(f"Results saved to {output_file}")
+
+    asyncio.run(arun())
 
 
 @app.command()
@@ -145,7 +159,7 @@ def mcp_server(transport, port, host, path, mock):
         )
     else:
         mcp.tool(
-            run_turn,
+            arun_turn,
             name="retrieve_data",
             description="Database query tool. Analyze the input question then generate a SQL query, execute it and return the result",
         )

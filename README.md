@@ -4,18 +4,6 @@ This is a SQL Question Answering application that allows users to interact with 
 
 ## Project Structure
 
-```text
-SQL-QA
-├── main.py                 # Main application entry point
-├── shared/                 # Shared utilities
-│   └── src/
-│       └── shared/
-│           ├── db.py       # Database connection utilities
-│           └── logger.py   # Logging utilities
-├── logs/                   # Log files directory
-├── requirements.txt        # Project dependencies
-└── README.md              # Project documentation
-```
 
 ## Features
 
@@ -70,11 +58,6 @@ sequenceDiagram
     Note over User, Executor: Optional Feedback Loop:<br/>User feedback → Example store → Improved future queries
 ```
 
-## Prerequisites
-
-- Python 3.10+
-- NPM
-
 ## Installation
 
 1. Clone the repository:
@@ -117,11 +100,13 @@ npm install -g @antv/mcp-server-chart
 
 ## Usage
 
-Run the application:
+- Update config at `conf/config.yaml`
+
+- Run the application:
 
 ```bash
 # API version
-uv run uvicorn src.sql_qa.cli:app --reload --port 8000
+# uv run uvicorn src.sql_qa.cli:app --reload --port 8000
 
 # Then test
 curl -X POST http://localhost:8000/v1/chat/completions \
@@ -138,12 +123,14 @@ curl -X POST http://localhost:8000/v1/chat/completions \
   "stream": false
 }'
 
+
+
 # UI version
 ## Start mpc-chart-server
 mcp-server-chart --transport sse --port 1122
 
 ## Start MCP SQL server
-uv run -m sql_qa.serving.text2sql mcp-server --transport sse
+uv run -m sql_qa.serving.app mcp-server --transport sse
 
 ## Start MCP retrieval leveled questions server
 
@@ -166,8 +153,11 @@ uv run ./orchestrator.py
 
 ```bash
 
+
 # Benchmark 
-uv run ./text2sql.py benchmark --file data/GSV/generated-data/gen_success_data.csv
+uv run ./src/sql_qa/serving/app.py benchmark \
+    --col-question question \
+    --file data/GSV/generated-data/gen_success_data.csv
 
 # Evaluation
 # For separate files

@@ -4,6 +4,39 @@ from sql_qa.config import get_app_config
 app_config = get_app_config()
 
 
+class DomainConstant:
+    refine_prompt = PromptTemplate(
+        template="""
+**Vai trò**:
+    *Bạn là 1 chuyên gia về lĩnh vực {domain} có nhiệm vụ làm rõ hơn câu hỏi của người dùng về lĩnh vực đó dựa trên tri thức được cung cấp. 
+
+**Quy trình**:
+    * Học từ `knowledge` được cung cấp ở phía dưới.
+    * Khi nhận được `question`, hãy phân tích nó rồi làm rõ hơn ý định của người dùng, các cụm từ nhập nhằng, giải thích các thuật ngữ chuyên môn (nếu cần)
+    * Trả về câu trả lời đã được cải tiến đầy đủ, rõ ý.
+
+**Dữ kiện**:
+    * `question`: 
+```
+{question}
+```
+
+    * `knowledge`:
+```
+{knowledge}
+```
+
+**Lưu ý**:
+    * Tuyệt đối không sử dụng tri thức đã có từ trước của bạn.
+    * Nhắc lại: nhiệm vụ của bạn là sử dụng tri thức được cung cấp để làm rõ ý hơn câu hỏi từ người dùng.
+    * Trả về duy nhất câu hỏi đã được cải thiện, tuyệt đối không giải thích gì thêm
+    * Tuyệt đối không hỏi lại người dùng, chỉ được cải thiện câu hỏi của người dùng thành câu hỏi mới hoàn chỉnh hơn
+    * Câu hỏi sau khi cải thiện phải giữ nguyên ngôi của người hỏi là người dùng. Ví dụ câu hỏi gốc có: tôi muốn.../ anh cần.../ chị hỏi... thì câu hỏi mới được cải thiện cũng phải được giữ nguyên ngôi hỏi như vậy
+        """,
+        role=Role.USER,
+    )
+
+
 class CommonConstant:
     empty_return_value = "Không có kết quả trả về"
 

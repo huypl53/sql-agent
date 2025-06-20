@@ -11,7 +11,7 @@ from langchain_core.messages import AnyMessage
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langgraph.graph.graph import CompiledGraph
 from langgraph.prebuilt import create_react_agent
-from shared.logger import get_main_logger
+from shared.logger import logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from colorama import Fore, Style
 from shared.tool import get_current_time
@@ -24,9 +24,7 @@ from langgraph_swarm import create_handoff_tool, create_swarm
 from langgraph.graph import END, START, StateGraph
 from langgraph_supervisor import create_supervisor, supervisor
 from sql_qa.schema.graph import EnhancementState
-from sql_qa.schema.tool import Text2SqlResult
 
-logger = get_main_logger(__name__, log_file=f"./logs/{__name__}.log")
 
 from sql_qa.config import get_app_config
 

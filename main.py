@@ -1,5 +1,5 @@
 import asyncio
-from shared.logger import get_logger
+from shared.logger import logger
 import pathlib
 import os
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
@@ -42,13 +42,6 @@ app.add_middleware(
 )
 
 config = get_app_config()
-# Initialize logger
-logger = get_logger(
-    "main",
-    log_file=config.logging.log_dir,
-    max_bytes=config.logging.max_bytes,
-    backup_count=config.logging.backup_count,
-)
 logger.info(f"Working directory: {os.getcwd()}")
 
 

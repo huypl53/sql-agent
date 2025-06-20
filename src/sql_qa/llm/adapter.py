@@ -30,9 +30,8 @@ import tenacity
 from sql_qa.llm.base import InvokableBase
 from sql_qa.llm.util import on_llm_retry_fail
 
-from shared.logger import get_logger
+from shared.logger import logger
 
-logger = get_logger(__name__)
 
 API_MODELS = ["gemini", "openai", "anthropic", "mistral"]
 

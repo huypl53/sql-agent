@@ -2,9 +2,7 @@ from typing import Any, Dict, List
 from langgraph.graph.graph import CompiledGraph
 import tenacity
 from sql_qa.llm.util import on_llm_retry_fail
-from shared.logger import get_logger
-
-logger = get_logger(__name__)
+from shared.logger import logger
 
 
 @tenacity.retry(

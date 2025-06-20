@@ -1,29 +1,49 @@
 from typing import Literal, Optional, Tuple, NamedTuple, cast
-from langgraph import graph
+from typing import List, Literal, Optional, NamedTuple, TypedDict
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.graph import CompiledGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from shared.db import get_db
-from shared.logger import get_main_logger, with_a_turn_logger
+from shared.logger import logger
+from sql_qa.config import turn_logger
 from sql_qa.llm.strategy import StrategyFactory
 from sql_qa.llm.type import (
     CandidateGenState,
     SqlLinkingTablesResponse,
-    SqlResponseEnhancementResponse,
     StrategyState,
 )
 from sql_qa.prompt.constant import CommonConstant, Text2SqlConstant
 from sql_qa.prompt.template import Role
-from sql_qa.llm.adapter import ApiAdapter, get_react_agent
+from sql_qa.llm.adapter import get_react_agent
 from sql_qa.schema.store import Schema, SchemaStore
-from sql_qa.config import get_app_config, turn_logger
+from sql_qa.config import get_app_config
 import json
 
-from sql_qa.state import SQL_AGENT_NODE, SqlAgentState
-from sql_qa.state import SqlAgentState
 
-logger = get_main_logger(__name__)
+from sql_qa.llm.type import (
+    SqlLinkingTablesResponse,
+    SQLGenerationResponse,
+    CandidateGenState,
+)
+
+
+class SQL_AGENT_NODE(NamedTuple):
+    schema_linking = "schema_linking_node"
+    filtered_schema_tables = "filtered_schema_tables_node"
+    generation = "generation_node"
+    response_enhancement = "response_enhancement_node"
+
+
+class SqlAgentState(SqlLinkingTablesResponse, SQLGenerationResponse):
+    user_question: str
+    is_success: bool
+    final_sql: str
+    final_result: str
+    error: str
+    raw_result: str
+    candidate_generation: Optional[List[CandidateGenState]]
+    # schema_linking: List[Any]
 
 
 class SqlAgent:
@@ -180,13 +200,13 @@ class SqlAgent:
         user_question = state["user_question"]
         strategy = self.strategy
         strategy_graph = strategy.graph
-        # strategy_results = strategy.generate(user_question, filtered_schema_tables)
         strategy_payload: StrategyState = {}
         strategy_payload["user_question"] = user_question
         strategy_payload["schema"] = filtered_schema_tables
 
         strategy_results = await strategy_graph.ainvoke(strategy_payload)
         strategy_results = cast(StrategyState, strategy_results)
+        turn_logger.log("strategy", strategy_results["logs"])
 
         strategy_logs = strategy_results["logs"]
         if not any(strategy_logs):
@@ -199,13 +219,20 @@ class SqlAgent:
         final_result = best_strategy_result["execution_result"]
 
         update: SqlAgentState = {}
-        update.update({
-            "is_success":True,
-            "error":"SQL execution failed",
-            "candidate_generation":strategy_logs,
-            "final_sql":final_sql or '',
-            "final_result":final_result or '',
-        })
+        update.update(
+            {
+                "is_success": True,
+                "error": "SQL execution failed",
+                "final_sql": final_sql or "",
+                "final_result": final_result or "",
+            }
+        )
+
+        update.update(
+            {
+                "candidate_generation": strategy_logs,
+            }
+        )
 
         return update
 
@@ -279,4 +306,7 @@ class SqlAgent:
         payload["user_question"] = user_question
         response = await self.graph.ainvoke(payload)
         response = cast(SqlAgentState, response)
+
+        # logger.info(f"final_state: {response}")
+        turn_logger.log("final_state", response)
         return response

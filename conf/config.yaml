@@ -24,6 +24,12 @@ turn_log_file: ${env:TURN_LOG_FILE, './logs/turn_log.csv'}
 orchestrator: 
   model: "google_genai:gemini-2.0-flash"
 
+question_proc:
+  model: "google_genai:gemini-2.0-flash"
+  domains: 
+    accountant:
+      knowledge_file: "./data/domain/accountant.txt"
+
 ####
 candidate_generations:
   - 
