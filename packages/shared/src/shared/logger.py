@@ -9,10 +9,12 @@ from functools import wraps
 import tempfile
 import shutil
 import subprocess
+import asyncio
 
 _LOG_BASE_NAME = ""
 csv.field_size_limit(sys.maxsize)
 CSV_DEMILITER = "|"
+
 
 def get_commit_hash():
     """Get the current git commit hash."""
@@ -56,7 +58,7 @@ def get_commit_timestamp_basename():
 def create_run_log_csv(csv_path="run_logs.csv"):
     """Create CSV file for tracking run logs and descriptions."""
     if not os.path.exists(csv_path):
-        with open(csv_path, "w", newline="") as f:
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
             import csv
 
             writer = csv.writer(f, delimiter=CSV_DEMILITER)
@@ -126,7 +128,7 @@ def setup_logger_with_commit_info(
 
 def add_run_to_csv(basename, csv_path="run_logs.csv", description=""):
     """Add a new run entry to the CSV file."""
-    with open(csv_path, "a", newline="") as f:
+    with open(csv_path, "a", newline="", encoding="utf-8") as f:
         import csv
 
         writer = csv.writer(f, delimiter=CSV_DEMILITER)
@@ -332,6 +334,8 @@ class TurnLogger:
                     quoting=csv.QUOTE_ALL,
                 )
                 writer.writerow(row)
+                csvfile.flush()
+                os.fsync(csvfile.fileno())
         except Exception as e:
             raise RuntimeError(f"Failed to save turn: {e}")
 
@@ -349,15 +353,34 @@ def with_a_turn_logger(turn_logger: TurnLogger):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            turn_logger.new_turn()
-            try:
-                result = func(*args, **kwargs)
-                return result
-            except Exception as e:
-                turn_logger.log("error", f"Error: {e}")
-                raise e
-            finally:
-                turn_logger.save_turn()
+            if not asyncio.iscoroutinefunction(func):
+                turn_logger.new_turn()
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                except Exception as e:
+                    turn_logger.log("error", f"Error: {e}")
+                    raise e
+                finally:
+                    logger.info(f"Waiting for saving turn log...")
+                    turn_logger.save_turn()
+                    logger.info(f"Turn log saved!")
+            else:
+
+                async def async_wrapper():
+                    turn_logger.new_turn()
+                    try:
+                        result = await func(*args, **kwargs)
+                        return result
+                    except Exception as e:
+                        turn_logger.log("error", f"Error: {e}")
+                        raise e
+                    finally:
+                        logger.info(f"Waiting for saving turn log...")
+                        await asyncio.to_thread(turn_logger.save_turn)
+                        logger.info(f"Turn log saved!")
+
+                return async_wrapper()
 
         return wrapper
 
@@ -376,7 +399,6 @@ add_run_to_csv(run_log_basename, csv_path)
 # Example usage:
 if __name__ == "__main__":
     # Example with timestamped log file in logs directory
-    # logger = get_logger(__name__, log_file="logs")
     logger.info("Logger initialized successfully")
     logger.debug("This is a debug message")
     logger.warning("This is a warning message")
