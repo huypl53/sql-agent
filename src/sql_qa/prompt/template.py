@@ -35,7 +35,7 @@ class PromptTemplate(BaseModel):
     """A class to manage prompt templates with variable substitution and AI-specific features."""
 
     template: str
-    role: Role = Role.ASSISTANT
+    role: Role = Role.USER
     metadata: Optional[TemplateMetadata] = Field(
         default_factory=TemplateMetadata, description="Metadata for the template"
     )

@@ -79,5 +79,8 @@ outputs/**
 data/
 
 Chinook.db
+.cursor
 
 *.json
+Session.vim
+tmp/

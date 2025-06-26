@@ -1,13 +1,15 @@
-from langchain_core.messages import HumanMessage
+import asyncio
 import streamlit as st
-from shared.logger import get_logger
+from shared.logger import logger
 
-from sql_qa.chat import gen_agent_executor
+from orchestrator import get_orchestrator_executor
+from sql_qa.utils.invocation import ainvoke_agent
 
-logger = get_logger(__name__, log_file="./logs/")
 
-from shared.db import get_db
-
+# Initialize the event loop
+if "loop" not in st.session_state:
+    st.session_state.loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(st.session_state.loop)
 
 st.title("Simple chat")
 st.sidebar.info("This is a sidebar.")
@@ -17,17 +19,15 @@ if "username" not in st.session_state:
     st.session_state.username = None
 
 
-def run():
+async def run():
     username = st.session_state.username
 
     if "agent_executor" not in st.session_state:
-        mdb = get_db()
-        agent_executor, checkpointer = next(gen_agent_executor(mdb))
+        agent_executor = await get_orchestrator_executor()
         st.session_state.agent_executor = agent_executor
-        st.session_state.checkpointer = checkpointer
 
+    configurable = {"configurable": {"thread_id": "1", "user_id": username}}
     agent_executor = st.session_state.agent_executor
-    checkpointer = st.session_state.checkpointer
 
     # Initialize chat history
     if "messages" not in st.session_state:
@@ -48,11 +48,11 @@ def run():
 
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
-            configurable = {"configurable": {"thread_id": "1", "user_id": username}}
             try:
                 logger.info(f"Prompt: {prompt}")
-                response = agent_executor.invoke(
-                    {"messages": st.session_state.messages[-10:]},
+                response = await ainvoke_agent(
+                    agent_executor,
+                    {"messages": st.session_state.messages[-20:]},
                     config=configurable,
                 )
                 logger.info(f"Response: {response}")
@@ -79,4 +79,8 @@ if st.session_state.username is None:
         st.rerun()
 else:
     st.write(f"Welcome, {st.session_state.username}!")
-    run()
+    try:
+        st.session_state.loop.run_until_complete(run())
+    except Exception as e:
+        logger.error(f"Error in main loop: {str(e)}")
+        st.error("An error occurred while processing your request. Please try again.")

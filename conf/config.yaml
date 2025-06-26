@@ -1,0 +1,100 @@
+server:
+  host: "0.0.0.0"
+  port: 8000
+  log_level: "info"
+  reload: true
+  workers: 1
+
+
+mode:  ${env:MODE, 'dev'}
+
+schema_path: ${env:SCHEMA_PATH}
+database: 
+    dialect:  ${env:DB_DIALECT, 'mysql'}
+    conn:  ${env:DB_CONN}
+
+
+llm: 
+  provider: {$env:LLM_MODEL_PROVIDER,'google_genai'}  
+  model: {$env:LLM_MODEL,'gemini-2.0-flash'}
+
+
+turn_log_file: ${env:TURN_LOG_FILE, './logs/turn_log.csv'} 
+
+orchestrator: 
+  model: "google_genai:gemini-2.0-flash"
+
+question_proc:
+  model: "google_genai:gemini-2.0-flash"
+  domains: 
+    accountant:
+      knowledge_file: "./extra/accountant.txt"
+
+####
+candidate_generations:
+  - 
+    prompt_type: "direct_generation"
+    query_validation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    generation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    query_fixer_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+  -
+    prompt_type: "cot_generation"
+    query_validation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    generation_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+    query_fixer_kwargs:
+      model: "google_genai:gemini-2.0-flash"
+  # -
+  #   prompt_type: "dac_cot_genration"
+  #   query_validation_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+  #   generation_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+  #   query_fixer_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+  # -
+  #   prompt_type: "query_plan_generation"
+  #   query_validation_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+  #   generation_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+  #   query_fixer_kwargs:
+  #     model: "google_genai:gemini-2.0-flash"
+
+merger:
+  model: "google_genai:gemini-2.0-flash"
+
+result_enhancement:
+  model: "google_genai:gemini-2.0-flash"
+
+schema_linking:
+  model: "google_genai:gemini-2.0-flash"
+  
+# MCP servers
+mcp_servers:
+  -
+    server_name: "mcp-server-chart"
+    url: "http://localhost:1122/sse"
+    transport: "sse"
+    # transport: "streamable_http"
+  # - 
+  #   server_name: "mcp-server-chart"
+  #   command: "mcp-server-chart"
+  #   args: ["--transport", "stdio"]
+  #   transport: "stdio"
+  -
+    server_name: "mcp-server-text2sql"
+    url: "http://127.0.0.1:8000/sse"
+    transport: "sse"
+    
+
+logging:
+  log_dir: './logs/'
+  level: 'INFO'
+  max_bytes:  ${env:LOG_MAX_BYTES}
+  backup_count:  ${env:LOG_BACKUP_COUNT}
+
