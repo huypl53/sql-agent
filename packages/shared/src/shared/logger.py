@@ -93,11 +93,11 @@ def setup_logger_with_commit_info(
             return super().format(record)
 
     # Set up logger
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
+    slogger = logging.getLogger(name)
+    slogger.setLevel(level)
 
     # Clear existing handlers
-    logger.handlers.clear()
+    slogger.handlers.clear()
 
     # Console handler
     console_handler = logging.StreamHandler()
@@ -106,7 +106,7 @@ def setup_logger_with_commit_info(
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
+    slogger.addHandler(console_handler)
 
     # File handler with commit_hash_timestamp basename
     log_filename = f"{basename}.log"
@@ -118,12 +118,12 @@ def setup_logger_with_commit_info(
         fmt="%(timestamp)s - %(name)s - %(levelname)s - [%(short_hash)s] - %(filename)s:%(lineno)d %(message)s"
     )
     file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+    slogger.addHandler(file_handler)
 
     # Store info for reference
 
-    setattr(logger, "basename", basename)
-    return logger
+    setattr(slogger, "basename", basename)
+    return slogger
 
 
 def add_run_to_csv(basename, csv_path="run_logs.csv", description=""):

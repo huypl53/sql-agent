@@ -1,10 +1,8 @@
 import asyncio
 import click
-import json
 import pandas as pd
 from tqdm import tqdm
 
-from sql_qa.agent.domain import QuestionDomainAgent, QuestionDomainAgentState
 from sql_qa.config import get_app_config, turn_logger
 from shared.logger import logger, with_a_turn_logger
 
@@ -21,7 +19,6 @@ logger.info(app_config)
 
 
 sql_agent = SqlAgent(app_config)
-domain_agent = QuestionDomainAgent().graph
 
 
 @click.group()
@@ -46,14 +43,7 @@ def cli():
 
 @with_a_turn_logger(turn_logger)
 async def arun_turn(user_question: str) -> SqlAgentState:
-    # domain_payload: QuestionDomainAgentState = {}
-    # domain_payload["user_question"] = user_question
-    # domain_payload["domain"] = "accountant"
-    # domain_response = await domain_agent.ainvoke(domain_payload)
-    # enhanced_question = domain_response["enhanced_question"]
     turn_logger.log("question", user_question)
-    # turn_logger.log("domain_quesiont", enhanced_question)
-    # updated_question = user_question + "\n" + enhanced_question
     question = user_question
     response = await sql_agent.arun(question)
     if response["is_success"]:

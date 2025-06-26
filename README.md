@@ -63,14 +63,16 @@ sequenceDiagram
 1. Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd SQL-QA
+git clone https://github.com/huypl53/sql-agent
+cd sql-agent
 ```
 
 2. Create and activate a virtual environment:
 
 ```bash
-python -m venv .venv
+# make sure uv installed
+# create venv
+uv venv
 # On Windows
 .venv\Scripts\activate
 # On Unix or MacOS
@@ -86,13 +88,13 @@ uv sync
 4. Set up environment variables:
    - Create a `.env` file in the project root using `.env.example`
 
-5. Generate sample database (if using SQLite):
+5. Generate sample database (using SQLite, if not skip this then use your own DB):
 
 ```bash
 curl -s https://raw.githubusercontent.com/lerocha/chinook-database/master/ChinookDatabase/DataSources/Chinook_Sqlite.sql | sqlite3 Chinook.db
 ```
 
-Start chart visulization server
+6. Install chart visulization server
 
 ```bash
 npm install -g @antv/mcp-server-chart
@@ -101,97 +103,52 @@ npm install -g @antv/mcp-server-chart
 ## Usage
 
 - Update config at `conf/config.yaml`
+- Start MCP servers:
+```bash
+## Start mpc-chart-server
+mcp-server-chart --transport sse --port 1122
 
-- Run the application:
+## Start MCP SQL server
+uv run -m sql_qa.serving.sql mcp-server --transport sse --port 8000
+```
+
+- Start chat bot API
+> This bot makes the conversation smoothly by clarifying user intent in conversation before sending question to text2sql module (ran via MCP server above)
+```bash
+uv run -m src.sql_qa.serving.bot start --host '127.0.0.1' --port 5000 --reload
+```
+
+- Test API
 
 ```bash
-# API version
-# uv run uvicorn src.sql_qa.cli:app --reload --port 8000
-
 # Then test
-curl -X POST http://localhost:8000/v1/chat/completions \
+curl -X POST http://localhost:5000/v1/chat/completions \
 -H "Content-Type: application/json" \
 -d '{
   "model": "gpt-3.5-turbo",
   "messages": [
     {
       "role": "user",
-      "content": "có bao nhiêu khách hàng trong CSDL?"
+      "content": "cho tôi doanh số tháng 4 của từng cơ sở"
     }
   ],
   "temperature": 0.7,
   "stream": false
 }'
-
-
-
-# UI version
-## Start mpc-chart-server
-mcp-server-chart --transport sse --port 1122
-
-## Start MCP SQL server
-uv run -m sql_qa.serving.app mcp-server --transport sse
-
-## Start MCP retrieval leveled questions server
-
-CHROMA_HF_MODEL=hiieu/halong_embedding uv run \
---directory /mnt/Code/code/AI/agentic-AI/MCP/chroma-mcp/ \
-chroma-mcp \
---client-type persistent \
---data-dir  /mnt/Code/code/AI/agentic-AI/SQL-QA/data/vector/gsv
-
-
-## Start streamlit app
-uv run streamlit run ./ui.py
-
-## Start cli app
-uv run ./orchestrator.py
-
 ```
 
 ## Evaluation
 
 ```bash
-
-
-# Benchmark 
-uv run ./src/sql_qa/serving/app.py benchmark \
+# Benchmark text2sql module only
+# CSV data should contain `question` column
+uv run ./src/sql_qa/serving/sql.py benchmark \
     --col-question question \
     --file data/GSV/generated-data/gen_success_data.csv
 
-# Evaluation
-# For separate files
-python -m src.sql_qa.metrics.evaluation evaluate-files \
-    --predicted-file predicted_queries.sql \
-    --ground-truth-file ground_truth_queries.sql \
-    --output-file results.json
-
-# For CSV file
-python -m src.sql_qa.metrics.evaluation evaluate-csv \
-    --input-file benchmark_results.csv \
-    --output-file results.json
-
-# Filter SQL pairs
-python -m src.sql_qa.metrics.filter filter-csv \
-    --input-file input.csv \
-    --output-file filtered.csv \
-    --skipped-file skipped.csv \
-    --max-result-length 1000
-
 ```
-
-Options:
-
-- `--verbose`: Enable verbose mode to see agent thoughts (default: True)
-- `--max-result-length`: Maximum length of result strings before skipping (default: 1000)
-- `--skipped-file`: Path to save skipped queries (default: skipped_queries.csv)
 
 ## License
 
 [Specify your license here]
 
-## Challenges
-
-```text
-E:\code\AI\agentic-AI\SQL-QA\.venv\Lib\site-packages\langchain_community\utilities\sql_database.py:348: SAWarning: Cannot correctly sort tables; there are unresolvable cycles between tables "employee, examination, package, patient, return_customer, user", which is usually caused by mutually dependent foreign key constraints.  Foreign key constraints involving these tables will not be considered; this warning may raise an error in a future release.
-```

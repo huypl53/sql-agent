@@ -178,7 +178,7 @@ class HuggingFaceAdapter(BaseAdapter):
 
 
 _retry_wrapper = tenacity.retry(
-    stop=tenacity.stop_after_attempt(7),
+    stop=tenacity.stop_after_attempt(1),
     wait=tenacity.wait_exponential(multiplier=1, min=7, max=60),
     retry=tenacity.retry_if_exception_type(Exception),
     reraise=True,
@@ -208,6 +208,7 @@ def get_react_agent(
         ]
     ] = None,
     pre_model_hook: Optional[RunnableLike] = None,
+    post_model_hook: Optional[RunnableLike] = None,
     state_schema: Optional[StateSchemaType] = None,
     config_schema: Optional[Type[Any]] = None,
     checkpointer: Optional[Checkpointer] = None,
@@ -244,6 +245,7 @@ def get_react_agent(
         agent_executor = create_react_agent(
             llm,
             tools=tools,
+            post_model_hook=post_model_hook,
             prompt=prompt,
             checkpointer=checkpointer,
             store=store,
@@ -257,6 +259,7 @@ def get_react_agent(
             prompt=prompt,
             response_format=response_format,
             pre_model_hook=pre_model_hook,
+            post_model_hook=post_model_hook,
             state_schema=state_schema,
             config_schema=config_schema,
             checkpointer=checkpointer,

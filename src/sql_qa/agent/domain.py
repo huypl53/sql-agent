@@ -1,9 +1,26 @@
 import asyncio
-from typing import Literal, Optional, NamedTuple, TypedDict, Dict
+import operator
+from typing import (
+    Annotated,
+    Callable,
+    Literal,
+    NamedTuple,
+    TypedDict,
+    Dict,
+    List,
+    Union,
+)
 
+from langchain_core.runnables import Runnable
+from langchain_core.tools.base import BaseTool
 from typing import Any
+from langchain_core.messages import AnyMessage, HumanMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import MessagesState
+from langgraph.graph.graph import CompiledGraph
+from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
+from sql_qa.agent.base import AgentBase, AgentBaseState
 from sql_qa.config import get_app_config
 from sql_qa.llm.adapter import get_react_agent
 from shared.logger import logger
@@ -12,6 +29,7 @@ from sql_qa.prompt.constant import DomainConstant
 from sql_qa.prompt.template import Role
 
 type TQuestionDomain = Literal["accountant"]
+app_config = get_app_config()
 
 
 class QUESTION_PROC_NODE(NamedTuple):
@@ -19,17 +37,13 @@ class QUESTION_PROC_NODE(NamedTuple):
     proc = "proc_node"
 
 
-class QuestionDomainAgentState(TypedDict):
-    user_question: str
+class QuestionDomainAgentState(AgentBaseState):
+    # messages: Annotated[List[AnyMessage], operator.add]
     domain: TQuestionDomain
-    knowledge: Optional[str]
-    enhanced_question: str
     pass
 
 
-NODE = QUESTION_PROC_NODE
-
-app_config = get_app_config()
+QU_NODE = QUESTION_PROC_NODE
 
 
 def get_domain_knowledge(knowledge_file: str) -> Any:
@@ -44,49 +58,68 @@ def get_domain_knowledge(knowledge_file: str) -> Any:
         return ""
 
 
-class QuestionDomainAgent:
-    def __init__(self) -> None:
-        self.graph = self._build_graph()
-        self.domain_agent = get_react_agent(app_config.question_proc.model)
+class QuestionDomainAgent(AgentBase):
+    def __init__(
+        self,
+        tools: List[Callable],
+        handoffs: List[BaseTool],
+        name: str = "domain_agent",
+    ) -> None:
+        super().__init__(tools, handoffs, name)
+
+    def _build_graph(self):
+        agent_tools = [*self._tools, *self._handoffs]
+        logger.info(f"Agent tools: {agent_tools}")
+        self.domain_agents: Dict[str, CompiledGraph] = {
+            k: create_react_agent(
+                app_config.question_proc.model,
+                tools=agent_tools,
+                prompt=DomainConstant.domain_system_prompt.format(
+                    domain=k, knowledge=get_domain_knowledge(f["knowledge_file"])
+                ),
+            )
+            for k, f in app_config.question_proc.domains.items()
+        }
+        # get_react_agent(app_config.question_proc.model)
         self.domain_knowledge: Dict[str, str] = {
             k: get_domain_knowledge(f["knowledge_file"])
             for k, f in app_config.question_proc.domains.items()
         }
 
-        self.graph = self._build_graph()
-
-    def _build_graph(self):
         graph_builder = StateGraph(QuestionDomainAgentState)
         # graph_builder.add_node(NODE.route, self.route_domain_proc)
-        graph_builder.add_node(NODE.proc, self.process_question)
+        graph_builder.add_node(
+            QU_NODE.proc,
+            self.process_question,
+            destinations=self.handoff_nodes,
+        )
 
-        graph_builder.add_edge(START, NODE.proc)
-        graph_builder.add_edge(NODE.proc, END)
+        for ho_node in self._handoff_nodes:
+            graph_builder.add_node(ho_node.name, ho_node)
 
-        return graph_builder.compile()
+        graph_builder.add_edge(START, QU_NODE.proc)
+        graph_builder.add_edge(QU_NODE.proc, END)
 
-    async def process_question(self, state: QuestionDomainAgentState) -> Command[END]:
+        return graph_builder.compile(name=self._name)
+
+    async def process_question(
+        self, state: QuestionDomainAgentState
+    ) -> Command[Literal[END]]:
         domain = state["domain"]
-        update: QuestionDomainAgentState = {**state}
-        if domain not in self.domain_knowledge:
-            update["enhanced_question"] = ""
+        update: QuestionDomainAgentState = {}
+        if domain not in self.domain_agents:
             logger.warning(f"Domain {domain} not loaded!\nCheck knowledge_file")
             return Command(goto=END, update=update)
-        knowledge = self.domain_knowledge[domain]
-        update.update({"knowledge": knowledge})
-        domain_prompt = DomainConstant.refine_prompt.format(
-            domain=domain, question=state["user_question"], knowledge=knowledge
-        )
+        agent = self.domain_agents[domain]
         try:
-            domain_agent_resp = await self.domain_agent.ainvoke(
-                {"messages": [{"role": Role.USER, "content": domain_prompt}]}
-            )
-            domain_agent_result: str = domain_agent_resp["messages"][-1].content
+            domain_agent_resp = await agent.ainvoke({"messages": state["messages"]})
+            last_message = domain_agent_resp["messages"][-1]
+            update.update({"messages": [last_message]})
+            # if type(last_message) == ToolMessage:
+            #     return Command(goto=state['active_agent'], graph=Command.PARENT, update=update)
+
         except Exception as e:
             logger.warning(f"Domain {domain} enhance question failed!\n Error: {e}")
-            domain_agent_result = ""
-
-        update.update({"enhanced_question": domain_agent_result})
 
         return Command(goto=END, update=update)
 
@@ -98,8 +131,10 @@ if __name__ == "__main__":
 
     async def arun():
         print(f"Original question: \n```{question}```")
-        payload: QuestionDomainAgentState = {}
-        payload.update(user_question=question, domain="accountant")
+        payload: QuestionDomainAgentState = {
+            "messages": [HumanMessage(content=question)],
+            "domain": "accountant",
+        }
         enhanced_question = await graph.ainvoke(payload)
         print(f"enhanced_question: \n ```{enhanced_question}```")
         return enhanced_question

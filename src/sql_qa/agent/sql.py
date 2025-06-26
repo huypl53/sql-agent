@@ -17,7 +17,6 @@ from sql_qa.prompt.constant import CommonConstant, Text2SqlConstant
 from sql_qa.prompt.template import Role
 from sql_qa.llm.adapter import get_react_agent
 from sql_qa.schema.store import Schema, SchemaStore
-from sql_qa.config import get_app_config
 import json
 
 
@@ -95,9 +94,9 @@ class SqlAgent:
             SQL_AGENT_NODE.filtered_schema_tables, self.filtered_schema_tables
         )
         graph_builder.add_node(SQL_AGENT_NODE.generation, self.generation)
-        graph_builder.add_node(
-            SQL_AGENT_NODE.response_enhancement, self.response_enhancement
-        )
+        # graph_builder.add_node(
+        #     SQL_AGENT_NODE.response_enhancement, self.response_enhancement
+        # )
 
         graph_builder.add_edge(START, SQL_AGENT_NODE.schema_linking)
         graph_builder.add_edge(
