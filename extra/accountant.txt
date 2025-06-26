@@ -1,0 +1,209 @@
+## TRI THỨC CỐT LÕI CHO CHATBOT LĨNH VỰC KẾ TOÁN & KINH DOANH
+
+Mục tiêu của bộ tri thức này là định nghĩa các khái niệm, dữ liệu và mối liên hệ giữa chúng, giúp chatbot phân tích câu hỏi người dùng thành các truy vấn dữ liệu cụ thể.
+
+### I. CÁC THỰC THỂ (Entities)
+
+Đây là các đối tượng chính mà chúng ta muốn thu thập thông tin hoặc thực hiện các hành động trên đó.
+
+1.  **Chi nhánh / Cơ sở:**
+    *   **Định nghĩa:** Một địa điểm kinh doanh cụ thể trong hệ thống.
+    *   **Các thuộc tính chính:**
+        *   `Mã chi nhánh` (ID)
+        *   `Tên chi nhánh` (VD: "Hà Đông", "Cầu Giấy", "Từ Liêm")
+        *   `Địa chỉ`
+        *   `Trạng thái hoạt động` (Đang hoạt động, Đã đóng cửa)
+
+2.  **Nhân viên:**
+    *   **Định nghĩa:** Cá nhân làm việc trong hệ thống.
+    *   **Các thuộc tính chính:**
+        *   `Mã nhân viên` (ID)
+        *   `Họ tên`
+        *   `Chức vụ` (Bác sĩ, Kỹ thuật viên, Telesale, Tư vấn, Kinh doanh, Quản lý,...)
+        *   `Ngày sinh`
+        *   `Trạng thái làm việc` (Đang làm, Đã nghỉ việc)
+        *   `Chi nhánh làm việc` (nếu có)
+
+3.  **Khách hàng:**
+    *   **Định nghĩa:** Cá nhân hoặc tổ chức sử dụng dịch vụ/mua sản phẩm.
+    *   **Các thuộc tính chính:**
+        *   `Mã khách hàng` (ID)
+        *   `Họ tên`
+        *   `Số điện thoại`
+        *   `Email`
+        *   `Ngày sinh`
+        *   `Ngày đăng ký`
+        *   `Loại khách hàng` (Khách mới, Khách cũ, VIP, Thân thiết,...)
+
+4.  **Lịch hẹn:**
+    *   **Định nghĩa:** Một cuộc hẹn đã được sắp xếp giữa khách hàng và nhân viên/dịch vụ.
+    *   **Các thuộc tính chính:**
+        *   `Mã lịch hẹn` (ID)
+        *   `Mã khách hàng`
+        *   `Mã nhân viên thực hiện` (Bác sĩ, Kỹ thuật viên)
+        *   `Mã nhân viên tạo` (Telesale, Tư vấn)
+        *   `Mã chi nhánh`
+        *   `Thời gian hẹn` (Ngày, Giờ)
+        *   `Thời gian tạo lịch hẹn`
+        *   `Trạng thái lịch hẹn` (Đã xác nhận, Đã thực hiện, Hủy, Đến muộn, Đang chờ,...)
+        *   `Dịch vụ liên quan` (Nếu lịch hẹn cho một dịch vụ cụ thể)
+
+5.  **Dịch vụ:**
+    *   **Định nghĩa:** Các gói dịch vụ mà doanh nghiệp cung cấp.
+    *   **Các thuộc tính chính:**
+        *   `Mã dịch vụ` (ID)
+        *   `Tên dịch vụ` (VD: "Trị mụn", "Chăm sóc da",...)
+        *   `Mô tả`
+        *   `Giá cơ bản`
+        *   `Phân loại dịch vụ` (Thẩm mỹ, Y tế,...)
+
+6.  **Sản phẩm:**
+    *   **Định nghĩa:** Các mặt hàng vật lý được bán.
+    *   **Các thuộc tính chính:**
+        *   `Mã sản phẩm` (ID)
+        *   `Tên sản phẩm` (VD: "Thuốc A", "Mỹ phẩm B",...)
+        *   `Loại sản phẩm` (Thuốc, Mỹ phẩm, Vật tư y tế,...)
+        *   `Giá bán lẻ`
+        *   `Tồn kho`
+
+7.  **Hóa đơn / Giao dịch:**
+    *   **Định nghĩa:** Bản ghi chi tiết về một giao dịch bán hàng hoặc cung cấp dịch vụ.
+    *   **Các thuộc tính chính:**
+        *   `Mã hóa đơn` (ID)
+        *   `Mã khách hàng`
+        *   `Mã lịch hẹn` (nếu hóa đơn phát sinh từ lịch hẹn)
+        *   `Ngày lập hóa đơn`
+        *   `Tổng tiền dịch vụ`
+        *   `Tổng tiền sản phẩm`
+        *   `Tổng tiền cọc`
+        *   `Tổng tiền giảm giá`
+        *   `Tổng công nợ` (số tiền khách hàng còn nợ)
+        *   `Tổng số tiền đã thanh toán`
+        *   `Trạng thái thanh toán` (Đã thanh toán, Chưa thanh toán, Thanh toán một phần)
+        *   `Mã chi nhánh` (nơi phát sinh hóa đơn)
+        *   `Mã nhân viên thu ngân/phụ trách`
+
+8.  **Chi phí:**
+    *   **Định nghĩa:** Các khoản tiền chi ra cho hoạt động kinh doanh.
+    *   **Các thuộc tính chính:**
+        *   `Mã chi phí` (ID)
+        *   `Hạng mục chi phí` (Thuê nhà, Lương, Vật tư, Điện nước, Marketing, Chi phí dịch vụ tư vấn,...)
+        *   `Số tiền`
+        *   `Ngày phát sinh`
+        *   `Mô tả`
+        *   `Mã chi nhánh` (nơi phát sinh chi phí)
+
+9.  **Khiếu nại:**
+    *   **Định nghĩa:** Phản hồi tiêu cực hoặc vấn đề phát sinh từ khách hàng.
+    *   **Các thuộc tính chính:**
+        *   `Mã khiếu nại` (ID)
+        *   `Mã khách hàng`
+        *   `Mã lịch hẹn/Hóa đơn liên quan`
+        *   `Mã nhân viên liên quan` (nếu khiếu nại về nhân viên)
+        *   `Ngày khiếu nại`
+        *   `Nội dung khiếu nại`
+        *   `Trạng thái xử lý` (Mới, Đang xử lý, Đã giải quyết,...)
+        *   `Phân loại khiếu nại` (Chất lượng dịch vụ, Thái độ nhân viên, Giá cả,...)
+
+### II. CÁC MỐI QUAN HỆ (Relationships)
+
+Cách các thực thể liên kết với nhau.
+
+*   `Lịch hẹn` **được thực hiện bởi** `Nhân viên` (Bác sĩ/Kỹ thuật viên)
+*   `Lịch hẹn` **được tạo bởi** `Nhân viên` (Telesale/Tư vấn)
+*   `Lịch hẹn` **liên quan đến** `Khách hàng`
+*   `Lịch hẹn` **diễn ra tại** `Chi nhánh`
+*   `Hóa đơn` **liên quan đến** `Lịch hẹn` (nếu có)
+*   `Hóa đơn` **được lập cho** `Khách hàng`
+*   `Hóa đơn` **bao gồm** `Dịch vụ` và/hoặc `Sản phẩm`
+*   `Chi phí` **phát sinh tại** `Chi nhánh`
+*   `Khiếu nại` **liên quan đến** `Khách hàng`, `Lịch hẹn`, `Hóa đơn`, hoặc `Nhân viên`
+*   `Nhân viên` **làm việc tại** `Chi nhánh`
+
+### III. CÁC CHỈ SỐ / ĐẠI LƯỢNG ĐO LƯỜNG (Metrics & Measures)
+
+Những giá trị số liệu quan trọng cần theo dõi, thường được tính toán từ các thực thể và thuộc tính.
+
+1.  **Doanh thu:**
+    *   `Tổng doanh thu` (từ Hóa đơn)
+    *   `Doanh thu dịch vụ` (từ Hóa đơn)
+    *   `Doanh thu bán thuốc/sản phẩm` (từ Hóa đơn)
+    *   `Doanh thu theo chi nhánh`
+    *   `Doanh thu theo nhân viên` (nếu có cơ chế gán doanh thu cho từng NV)
+    *   `Doanh thu theo dịch vụ/sản phẩm`
+    *   `Doanh thu từ khách hàng mới`
+    *   `Doanh thu từ khách hàng cũ`
+    *   `Tỷ trọng doanh thu` (VD: Tỷ trọng doanh thu từ khách mới trên tổng doanh thu)
+    *   `Tốc độ tăng trưởng doanh thu` (so với kỳ trước/cùng kỳ năm trước)
+
+2.  **Chi phí:**
+    *   `Tổng chi phí`
+    *   `Chi phí theo hạng mục`
+    *   `Chi phí theo chi nhánh`
+    *   `Tổng chi phí dịch vụ phát sinh` (như trong ví dụ của bạn)
+
+3.  **Hoạt động Lịch hẹn:**
+    *   `Tổng số lịch hẹn`
+    *   `Số lượng lịch hẹn đã thực hiện`
+    *   `Số lượng lịch hẹn bị hủy`
+    *   `Số lượng lịch hẹn theo trạng thái cụ thể`
+    *   `Số lượng lịch hẹn do từng nhân viên tạo` (Telesale, Tư vấn)
+    *   `Số lượng lịch hẹn do từng nhân viên thực hiện` (Bác sĩ, Kỹ thuật viên)
+    *   `Tốc độ tăng trưởng số lượng lịch hẹn`
+
+4.  **Khách hàng:**
+    *   `Tổng số khách hàng`
+    *   `Số lượng khách hàng mới`
+    *   `Số lượng khách hàng cũ`
+    *   `Tổng số khách có khiếu nại`
+    *   `Tổng số khách có công nợ`
+    *   `Tổng số khách có sinh nhật trong tháng`
+
+5.  **Sản phẩm/Dịch vụ:**
+    *   `Số lượng dịch vụ đã thực hiện/bán ra`
+    *   `Số lượng sản phẩm đã bán ra`
+    *   `Top N dịch vụ/sản phẩm có doanh thu cao nhất`
+    *   `Top N dịch vụ/sản phẩm bán chạy nhất (theo số lượng)`
+    *   `Top N dịch vụ/sản phẩm bán chậm nhất`
+
+6.  **Tài chính khác (từ Hóa đơn):**
+    *   `Tổng số tiền cọc`
+    *   `Tổng số tiền giảm giá`
+    *   `Tổng số tiền công nợ` (tổng số tiền khách hàng còn nợ)
+    *   `Tổng số tiền hóa đơn dịch vụ` (tổng doanh thu dịch vụ trên các hóa đơn)
+    *   `Tổng số tiền hóa đơn thuốc` (tổng doanh thu thuốc trên các hóa đơn)
+
+### IV. CÁC TIÊU CHÍ LỌC VÀ NHÓM (Filtering & Grouping Criteria)
+
+Đây là cách chatbot sẽ sử dụng để thu hẹp hoặc tổng hợp dữ liệu dựa trên các điều kiện trong câu hỏi.
+
+1.  **Theo Thời gian:**
+    *   `Ngày cụ thể` (VD: "12/03/2025", "hôm nay")
+    *   `Khoảng thời gian` (VD: "tuần này", "tháng trước", "quý 1", "tháng 3 năm 2025")
+    *   `So sánh kỳ` (VD: "tháng này so với tháng trước", "quý 1 năm nay so với quý 1 năm ngoái")
+
+2.  **Theo Địa điểm:**
+    *   `Chi nhánh cụ thể` (VD: "Hà Đông", "Cầu Giấy", "Từ Liêm")
+    *   `Toàn hệ thống`
+
+3.  **Theo Đối tượng:**
+    *   `Loại nhân viên` (Bác sĩ, Kỹ thuật viên, Telesale, Nhân viên kinh doanh, Nhân viên tư vấn)
+    *   `Tên nhân viên cụ thể`
+    *   `Loại khách hàng` (Mới, Cũ)
+
+4.  **Theo Loại / Hạng mục:**
+    *   `Tên dịch vụ cụ thể` (VD: "dịch vụ trị mụn")
+    *   `Loại sản phẩm` (Thuốc, Mỹ phẩm)
+    *   `Hạng mục chi phí`
+
+5.  **Theo Trạng thái:**
+    *   `Trạng thái lịch hẹn` (VD: "hủy", "đã thực hiện", "là 4")
+    *   `Trạng thái hóa đơn` (VD: "đã thanh toán")
+    *   `Trạng thái khiếu nại` (có liên quan khiếu nại)
+
+6.  **Theo Giá trị:**
+    *   `Lớn hơn 0` (cho các khoản tiền cọc, giảm giá, công nợ, doanh thu)
+    *   `Cao nhất / Thấp nhất` (để tìm top)
+    *   `Nhanh nhất` (cho tốc độ tăng trưởng)
+    *   `Lớn nhất / Nhỏ nhất` (cho tổng chi phí, số lượng)
+

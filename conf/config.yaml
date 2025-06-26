@@ -28,7 +28,7 @@ question_proc:
   model: "google_genai:gemini-2.0-flash"
   domains: 
     accountant:
-      knowledge_file: "./data/domain/accountant.txt"
+      knowledge_file: "./extra/accountant.txt"
 
 ####
 candidate_generations:
@@ -91,12 +91,6 @@ mcp_servers:
     url: "http://127.0.0.1:8000/sse"
     transport: "sse"
     
-  
-
-vector_store:
-  collection_name: "gsv"
-  persistent_dir: "/mnt/Code/code/AI/agentic-AI/SQL-QA/data/vector/gsv"
-  embedding_model: "hiieu/halong_embedding"
 
 logging:
   log_dir: './logs/'
